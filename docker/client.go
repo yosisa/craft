@@ -85,6 +85,7 @@ func (c *Client) Run(m *Manifest) error {
 		Binds:        m.Binds(),
 		PortBindings: m.PortBindings(),
 		DNS:          m.DNS,
+		NetworkMode:  m.NetworkMode,
 	})
 	if err != nil || m.StartWait == 0 {
 		return err

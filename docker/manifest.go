@@ -10,7 +10,10 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-var validImageTag = regexp.MustCompile(`(.+?)(:[\w][\w.-]{0,127})?$`)
+var (
+	validImageTag    = regexp.MustCompile(`(.+?)(:[\w][\w.-]{0,127})?$`)
+	validNetworkMode = regexp.MustCompile(`(bridge|none|host|container:[\w][\w.-]*)`)
+)
 
 type Manifest struct {
 	Name        string
@@ -21,6 +24,7 @@ type Manifest struct {
 	Env         Env
 	Cmd         []string
 	DNS         []string
+	NetworkMode string `toml:"network_mode"`
 	Restrict    Restrict
 	StartWait   uint `toml:"start_wait"`
 	Replace     string
@@ -30,6 +34,9 @@ type Manifest struct {
 func (m *Manifest) Validate() error {
 	if !validImageTag.MatchString(m.Image) {
 		return fmt.Errorf("Invalid image name: %s", m.Image)
+	}
+	if m.NetworkMode != "" && !validNetworkMode.MatchString(m.NetworkMode) {
+		return fmt.Errorf("Invalid network mode: %s", m.NetworkMode)
 	}
 	if m.ReplaceWait == 0 {
 		m.ReplaceWait = 10

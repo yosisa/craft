@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/yosisa/craft/config"
@@ -118,12 +119,14 @@ func gatherCapabilities(agents []string) Capabilities {
 }
 
 func findBestAgent(m *docker.Manifest, caps Capabilities) string {
+	// Check existence of a container to be replaced
 	if m.Replace != "" {
 		caps.Filter(func(cap *rpc.Capability) bool {
 			return stringSlice(cap.AllNames).Contains(m.Replace)
 		})
 	}
 
+	// Check availability of name
 	caps2 := caps.Copy()
 	caps.Filter(func(cap *rpc.Capability) bool {
 		return !stringSlice(cap.UsedNames).Contains(m.Name)
@@ -132,6 +135,7 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 		caps = caps2
 	}
 
+	// Check availability of ports
 	caps.Filter(func(cap *rpc.Capability) bool {
 		for _, p := range m.Ports {
 			becomeAvailable, ok := cap.Containers[m.Replace]
@@ -145,6 +149,15 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 		return true
 	})
 
+	// Check existence of a network container
+	if strings.HasPrefix(m.NetworkMode, "container:") {
+		name := m.NetworkMode[10:]
+		caps.Filter(func(cap *rpc.Capability) bool {
+			return stringSlice(cap.UsedNames).Contains(name)
+		})
+	}
+
+	// Agent name restriction
 	if m.Restrict.Agent != "" {
 		re, _ := regexp.Compile(m.Restrict.Agent)
 		caps.Filter(func(cap *rpc.Capability) bool {
@@ -152,6 +165,7 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 		})
 	}
 
+	// Choice agent that has least active containers
 	running := 1024 * 1024 * 1024 // it's large enough
 	var agent string
 	for addr, cap := range caps {
