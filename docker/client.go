@@ -57,8 +57,9 @@ func (c *Client) Usage() (*UsageInfo, error) {
 }
 
 func (c *Client) Run(m *Manifest) error {
-	if hash := c.ImageHash(m.Image, m.Tag); hash == "" || !strings.HasPrefix(hash, m.ImageHash) {
-		if err := c.PullImage(m.Image, m.Tag); err != nil {
+	image, tag := m.SplitImageTag()
+	if hash := c.ImageHash(image, tag); hash == "" || !strings.HasPrefix(hash, m.ImageHash) {
+		if err := c.PullImage(image, tag); err != nil {
 			return err
 		}
 	}

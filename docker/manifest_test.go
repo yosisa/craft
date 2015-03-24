@@ -19,6 +19,32 @@ var vspec = `
 volumes = ["/var/tmp", "/data -> /opt"]
 `
 
+type ManifestSuite struct{}
+
+var _ = Suite(&ManifestSuite{})
+
+func (s *ManifestSuite) TestSplitImageTag(c *C) {
+	m := &Manifest{Image: "go"}
+	image, tag := m.SplitImageTag()
+	c.Assert(image, Equals, "go")
+	c.Assert(tag, Equals, "latest")
+
+	m = &Manifest{Image: "go:1.4"}
+	image, tag = m.SplitImageTag()
+	c.Assert(image, Equals, "go")
+	c.Assert(tag, Equals, "1.4")
+
+	m = &Manifest{Image: "localhost:5000/myimage"}
+	image, tag = m.SplitImageTag()
+	c.Assert(image, Equals, "localhost:5000/myimage")
+	c.Assert(tag, Equals, "latest")
+
+	m = &Manifest{Image: "localhost:5000/myimage:beta"}
+	image, tag = m.SplitImageTag()
+	c.Assert(image, Equals, "localhost:5000/myimage")
+	c.Assert(tag, Equals, "beta")
+}
+
 type PortSpecSuite struct{}
 
 var _ = Suite(&PortSpecSuite{})

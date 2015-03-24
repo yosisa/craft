@@ -10,10 +10,11 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
+var validImageTag = regexp.MustCompile(`(.+?)(:[\w][\w.-]{0,127})?$`)
+
 type Manifest struct {
 	Name        string
 	Image       string
-	Tag         string
 	ImageHash   string `toml:"image_hash"`
 	Ports       []PortSpec
 	Volumes     []VolumeSpec
@@ -27,13 +28,21 @@ type Manifest struct {
 }
 
 func (m *Manifest) Validate() error {
-	if m.Tag == "" {
-		m.Tag = "latest"
+	if !validImageTag.MatchString(m.Image) {
+		return fmt.Errorf("Invalid image name: %s", m.Image)
 	}
 	if m.ReplaceWait == 0 {
 		m.ReplaceWait = 10
 	}
 	return m.Restrict.Validate()
+}
+
+func (m *Manifest) SplitImageTag() (string, string) {
+	g := validImageTag.FindStringSubmatch(m.Image)
+	if g[2] != "" {
+		return g[1], g[2][1:]
+	}
+	return g[1], "latest"
 }
 
 func (m *Manifest) ExposedPorts() map[docker.Port]struct{} {
