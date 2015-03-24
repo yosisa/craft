@@ -17,6 +17,7 @@ type Manifest struct {
 	ImageHash   string `toml:"image_hash"`
 	Ports       []PortSpec
 	Volumes     []VolumeSpec
+	Env         Env
 	Cmd         []string
 	DNS         []string
 	Restrict    Restrict
@@ -109,6 +110,16 @@ func (s *VolumeSpec) UnmarshalText(b []byte) error {
 
 func (s *VolumeSpec) String() string {
 	return s.Path + ":" + s.Target
+}
+
+type Env map[string]string
+
+func (e Env) Pairs() []string {
+	var pairs []string
+	for k, v := range e {
+		pairs = append(pairs, k+"="+v)
+	}
+	return pairs
 }
 
 type Restrict struct {

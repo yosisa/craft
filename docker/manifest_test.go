@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -59,4 +60,15 @@ func (s *VolumeSpecSuite) TestUnmarshal(c *C) {
 func (s *VolumeSpecSuite) TestString(c *C) {
 	vs := VolumeSpec{Path: "/data", Target: "/opt"}
 	c.Assert(vs.String(), Equals, "/data:/opt")
+}
+
+type EnvSuite struct{}
+
+var _ = Suite(&EnvSuite{})
+
+func (s *EnvSuite) TestPairs(c *C) {
+	e := Env{"USER": "foo", "TESTING": "yes"}
+	pairs := e.Pairs()
+	sort.Strings(pairs)
+	c.Assert(pairs, DeepEquals, []string{"TESTING=yes", "USER=foo"})
 }

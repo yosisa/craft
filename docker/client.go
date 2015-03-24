@@ -69,6 +69,7 @@ func (c *Client) Run(m *Manifest) error {
 		Name: m.Name,
 		Config: &docker.Config{
 			Image:        m.Image,
+			Env:          m.Env.Pairs(),
 			Cmd:          m.Cmd,
 			ExposedPorts: m.ExposedPorts(),
 		},
