@@ -149,6 +149,16 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 		return true
 	})
 
+	// Check existence of containers to be linked
+	caps.Filter(func(cap *rpc.Capability) bool {
+		for _, link := range m.Links {
+			if !stringSlice(cap.UsedNames).Contains(link.Name) {
+				return false
+			}
+		}
+		return true
+	})
+
 	// Check existence of a network container
 	if strings.HasPrefix(m.NetworkMode, "container:") {
 		name := m.NetworkMode[10:]

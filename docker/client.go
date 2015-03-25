@@ -84,6 +84,7 @@ func (c *Client) Run(m *Manifest) error {
 	err = c.c.StartContainer(con.ID, &docker.HostConfig{
 		Binds:        m.Binds(),
 		PortBindings: m.PortBindings(),
+		Links:        m.LinkList(),
 		DNS:          m.DNS,
 		NetworkMode:  m.NetworkMode,
 	})

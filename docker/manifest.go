@@ -21,6 +21,7 @@ type Manifest struct {
 	ImageHash   string `toml:"image_hash"`
 	Ports       []PortSpec
 	Volumes     []VolumeSpec
+	Links       []Link
 	Env         Env
 	Cmd         []string
 	DNS         []string
@@ -85,6 +86,14 @@ func (m *Manifest) Binds() []string {
 	return s
 }
 
+func (m *Manifest) LinkList() []string {
+	var s []string
+	for _, v := range m.Links {
+		s = append(s, v.String())
+	}
+	return s
+}
+
 type PortSpec struct {
 	Exposed  docker.Port
 	HostIP   string
@@ -126,6 +135,26 @@ func (s *VolumeSpec) UnmarshalText(b []byte) error {
 
 func (s *VolumeSpec) String() string {
 	return s.Path + ":" + s.Target
+}
+
+type Link struct {
+	Name  string
+	Alias string
+}
+
+func (l *Link) UnmarshalText(b []byte) error {
+	items := bytes.Split(b, []byte(":"))
+	l.Name = string(items[0])
+	if len(items) == 1 {
+		l.Alias = l.Name
+	} else {
+		l.Alias = string(items[1])
+	}
+	return nil
+}
+
+func (l *Link) String() string {
+	return l.Name + ":" + l.Alias
 }
 
 type Env map[string]string

@@ -105,6 +105,28 @@ func (s *VolumeSpecSuite) TestString(c *C) {
 	c.Assert(vs.String(), Equals, "/data:/opt")
 }
 
+type LinkSuite struct{}
+
+var _ = Suite(&LinkSuite{})
+
+func (s *LinkSuite) TestUnmarshal(c *C) {
+	var v struct{ L []Link }
+	text := `l = ["name", "name:alias"]` + "\n"
+	_, err := toml.Decode(text, &v)
+	c.Assert(err, IsNil)
+
+	c.Assert(v.L[0].Name, Equals, "name")
+	c.Assert(v.L[0].Alias, Equals, "name")
+
+	c.Assert(v.L[1].Name, Equals, "name")
+	c.Assert(v.L[1].Alias, Equals, "alias")
+}
+
+func (s LinkSuite) TestString(c *C) {
+	l := Link{Name: "name", Alias: "alias"}
+	c.Assert(l.String(), Equals, "name:alias")
+}
+
 type EnvSuite struct{}
 
 var _ = Suite(&EnvSuite{})
