@@ -1,22 +1,28 @@
 package config
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"os"
-
-	"github.com/BurntSushi/toml"
 )
 
 type Config struct {
 	Listen    string
 	Docker    string
-	AgentName string `toml:"agent_name"`
+	AgentName string `json:"agent_name"`
 	Agents    []string
 }
 
 func Parse(path string) (*Config, error) {
 	var c Config
-	if _, err := toml.DecodeFile(path, &c); err != nil {
-		return nil, err
+	if path != "" {
+		b, err := ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(b, &c); err != nil {
+			return nil, err
+		}
 	}
 	if c.Listen == "" {
 		c.Listen = ":7300"

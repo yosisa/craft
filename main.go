@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	configPath     = kingpin.Flag("config", "").Short('c').Default("craft.toml").String()
+	configPath     = kingpin.Flag("config", "").Short('c').String()
 	agent          = kingpin.Command("agent", "")
 	usage          = kingpin.Command("usage", "")
 	submit         = kingpin.Command("submit", "")
