@@ -22,6 +22,7 @@ type Manifest struct {
 	Ports       []PortSpec
 	Volumes     []VolumeSpec
 	Links       []Link
+	ExLinks     []Link
 	Env         Env
 	Cmd         []string
 	DNS         []string
@@ -92,6 +93,15 @@ func (m *Manifest) LinkList() []string {
 		s = append(s, v.String())
 	}
 	return s
+}
+
+func (m *Manifest) MergeEnv(env map[string]string) {
+	if m.Env == nil {
+		m.Env = make(Env)
+	}
+	for k, v := range env {
+		m.Env[k] = v
+	}
 }
 
 type PortSpec struct {

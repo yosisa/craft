@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -51,9 +53,13 @@ func main() {
 		}
 
 		caps := gatherCapabilities(conf.Agents)
-		agent := findBestAgent(m, caps)
+		agent := findBestAgent(m, caps.Copy())
 		if agent == "" {
 			log.Fatal(errors.New("No available agents"))
+		}
+		exlinks, err := resolveExLinks(m, caps)
+		if err != nil {
+			log.Fatal(err)
 		}
 
 		c, err := rpc.Dial("tcp", agent)
@@ -62,8 +68,12 @@ func main() {
 		}
 		defer c.Close()
 
+		req := rpc.SubmitRequest{
+			Manifest: m,
+			ExLinks:  exlinks,
+		}
 		var resp rpc.SubmitResponse
-		if err = c.Call("Craft.Submit", *m, &resp); err != nil {
+		if err = c.Call("Craft.Submit", req, &resp); err != nil {
 			log.Fatal(err)
 		}
 		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
@@ -139,7 +149,7 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 	caps.Filter(func(cap *rpc.Capability) bool {
 		for _, p := range m.Ports {
 			becomeAvailable, ok := cap.Containers[m.Replace]
-			if ok && int64Slice(becomeAvailable.Ports).Contains(p.HostPort) {
+			if ok && portSpecSlice(becomeAvailable.Ports).Contains(p.HostPort) {
 				continue
 			}
 			if int64Slice(cap.UsedPorts).Contains(p.HostPort) {
@@ -187,6 +197,45 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 	return agent
 }
 
+func resolveExLinks(m *docker.Manifest, caps Capabilities) ([]*rpc.ExLink, error) {
+	var out []*rpc.ExLink
+	for _, l := range m.ExLinks {
+		caps2 := caps.Copy()
+		caps2.Filter(func(cap *rpc.Capability) bool {
+			return stringSlice(cap.UsedNames).Contains(l.Name) &&
+				len(cap.IPAddrs) > 0
+		})
+		if len(caps2) == 0 {
+			return nil, errors.New("No linkable containers")
+		}
+		_, cap := choice(caps2)
+		ci := cap.Containers[l.Name]
+		for _, port := range ci.Ports {
+			addr := port.HostIP
+			if addr == "0.0.0.0" {
+				addr = cap.IPAddrs[0]
+			}
+			out = append(out, &rpc.ExLink{
+				Name:    l.Alias,
+				Exposed: string(port.Exposed),
+				Addr:    addr,
+				Port:    int(port.HostPort),
+			})
+		}
+	}
+	return out, nil
+}
+
+func choice(caps Capabilities) (string, *rpc.Capability) {
+	var keys []string
+	for k := range caps {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	n := rand.Intn(len(keys))
+	return keys[n], caps[keys[n]]
+}
+
 type stringSlice []string
 
 func (ss stringSlice) Contains(s string) bool {
@@ -203,6 +252,17 @@ type int64Slice []int64
 func (is int64Slice) Contains(n int64) bool {
 	for _, v := range is {
 		if v == n {
+			return true
+		}
+	}
+	return false
+}
+
+type portSpecSlice []*docker.PortSpec
+
+func (ps portSpecSlice) Contains(n int64) bool {
+	for _, v := range ps {
+		if v.HostPort == n {
 			return true
 		}
 	}

@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ type UsageInfo struct {
 }
 
 type ContainerInfo struct {
-	Ports []int64
+	Ports []*PortSpec
 }
 
 type Client struct {
@@ -45,13 +46,19 @@ func (c *Client) Usage() (*UsageInfo, error) {
 		}
 		ui.UsedNames = append(ui.UsedNames, name)
 		var ports []int64
+		var portSpecs []*PortSpec
 		for _, p := range c.Ports {
 			if p.PublicPort > 0 {
 				ports = append(ports, p.PublicPort)
+				portSpecs = append(portSpecs, &PortSpec{
+					Exposed:  docker.Port(fmt.Sprintf("%d/%s", p.PrivatePort, p.Type)),
+					HostIP:   p.IP,
+					HostPort: p.PublicPort,
+				})
 			}
 		}
 		ui.UsedPorts = append(ui.UsedPorts, ports...)
-		ui.Containers[name] = &ContainerInfo{Ports: ports}
+		ui.Containers[name] = &ContainerInfo{Ports: portSpecs}
 	}
 	return &ui, nil
 }

@@ -62,6 +62,15 @@ func (s *ManifestSuite) TestPort(c *C) {
 	})
 }
 
+func (s *ManifestSuite) TestMergeEnv(c *C) {
+	m := &Manifest{}
+	m.MergeEnv(map[string]string{"ID": "1"})
+	c.Assert(m.Env, DeepEquals, Env{"ID": "1"})
+
+	m.MergeEnv(map[string]string{"TESTING": "yes"})
+	c.Assert(m.Env, DeepEquals, Env{"ID": "1", "TESTING": "yes"})
+}
+
 type PortSpecSuite struct{}
 
 var _ = Suite(&PortSpecSuite{})
