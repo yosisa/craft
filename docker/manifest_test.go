@@ -1,23 +1,15 @@
 package docker
 
 import (
+	"encoding/json"
 	"sort"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/fsouza/go-dockerclient"
 	. "gopkg.in/check.v1"
 )
 
 func Test(t *testing.T) { TestingT(t) }
-
-var pspec = `
-ports = ["80/tcp", "80 -> 80/tcp", "127.0.0.1:80 -> 80/tcp"]
-`
-
-var vspec = `
-volumes = ["/var/tmp", "/data -> /opt"]
-`
 
 type ManifestSuite struct{}
 
@@ -76,21 +68,23 @@ type PortSpecSuite struct{}
 var _ = Suite(&PortSpecSuite{})
 
 func (s *PortSpecSuite) TestUnmarshal(c *C) {
-	var ps struct{ Ports []PortSpec }
-	_, err := toml.Decode(pspec, &ps)
+	text := `["80/tcp", "80 -> 80/tcp", "127.0.0.1:80 -> 80/tcp"]`
+	var ports []PortSpec
+	err := json.Unmarshal([]byte(text), &ports)
 	c.Assert(err, IsNil)
+	c.Assert(ports, HasLen, 3)
 
-	c.Assert(ps.Ports[0].Exposed, Equals, docker.Port("80/tcp"))
-	c.Assert(ps.Ports[0].HostIP, Equals, "")
-	c.Assert(ps.Ports[0].HostPort, Equals, int64(0))
+	c.Assert(ports[0].Exposed, Equals, docker.Port("80/tcp"))
+	c.Assert(ports[0].HostIP, Equals, "")
+	c.Assert(ports[0].HostPort, Equals, int64(0))
 
-	c.Assert(ps.Ports[1].Exposed, Equals, docker.Port("80/tcp"))
-	c.Assert(ps.Ports[1].HostIP, Equals, "")
-	c.Assert(ps.Ports[1].HostPort, Equals, int64(80))
+	c.Assert(ports[1].Exposed, Equals, docker.Port("80/tcp"))
+	c.Assert(ports[1].HostIP, Equals, "")
+	c.Assert(ports[1].HostPort, Equals, int64(80))
 
-	c.Assert(ps.Ports[2].Exposed, Equals, docker.Port("80/tcp"))
-	c.Assert(ps.Ports[2].HostIP, Equals, "127.0.0.1")
-	c.Assert(ps.Ports[2].HostPort, Equals, int64(80))
+	c.Assert(ports[2].Exposed, Equals, docker.Port("80/tcp"))
+	c.Assert(ports[2].HostIP, Equals, "127.0.0.1")
+	c.Assert(ports[2].HostPort, Equals, int64(80))
 }
 
 type VolumeSpecSuite struct{}
@@ -98,15 +92,17 @@ type VolumeSpecSuite struct{}
 var _ = Suite(&VolumeSpecSuite{})
 
 func (s *VolumeSpecSuite) TestUnmarshal(c *C) {
-	var vs struct{ Volumes []VolumeSpec }
-	_, err := toml.Decode(vspec, &vs)
+	text := `["/var/tmp", "/data -> /opt"]`
+	var volumes []VolumeSpec
+	err := json.Unmarshal([]byte(text), &volumes)
 	c.Assert(err, IsNil)
+	c.Assert(volumes, HasLen, 2)
 
-	c.Assert(vs.Volumes[0].Path, Equals, "/var/tmp")
-	c.Assert(vs.Volumes[0].Target, Equals, "/var/tmp")
+	c.Assert(volumes[0].Path, Equals, "/var/tmp")
+	c.Assert(volumes[0].Target, Equals, "/var/tmp")
 
-	c.Assert(vs.Volumes[1].Path, Equals, "/data")
-	c.Assert(vs.Volumes[1].Target, Equals, "/opt")
+	c.Assert(volumes[1].Path, Equals, "/data")
+	c.Assert(volumes[1].Target, Equals, "/opt")
 }
 
 func (s *VolumeSpecSuite) TestString(c *C) {
@@ -119,16 +115,17 @@ type LinkSuite struct{}
 var _ = Suite(&LinkSuite{})
 
 func (s *LinkSuite) TestUnmarshal(c *C) {
-	var v struct{ L []Link }
-	text := `l = ["name", "name:alias"]` + "\n"
-	_, err := toml.Decode(text, &v)
+	var links []Link
+	text := `["name", "name:alias"]`
+	err := json.Unmarshal([]byte(text), &links)
 	c.Assert(err, IsNil)
+	c.Assert(links, HasLen, 2)
 
-	c.Assert(v.L[0].Name, Equals, "name")
-	c.Assert(v.L[0].Alias, Equals, "name")
+	c.Assert(links[0].Name, Equals, "name")
+	c.Assert(links[0].Alias, Equals, "name")
 
-	c.Assert(v.L[1].Name, Equals, "name")
-	c.Assert(v.L[1].Alias, Equals, "alias")
+	c.Assert(links[1].Name, Equals, "name")
+	c.Assert(links[1].Alias, Equals, "alias")
 }
 
 func (s LinkSuite) TestString(c *C) {

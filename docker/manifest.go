@@ -2,11 +2,12 @@ package docker
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"strconv"
 
-	"github.com/BurntSushi/toml"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -18,7 +19,7 @@ var (
 type Manifest struct {
 	Name        string
 	Image       string
-	ImageHash   string `toml:"image_hash"`
+	ImageHash   string `json:"image_hash"`
 	Ports       []PortSpec
 	Volumes     []VolumeSpec
 	Links       []Link
@@ -26,11 +27,11 @@ type Manifest struct {
 	Env         Env
 	Cmd         []string
 	DNS         []string
-	NetworkMode string `toml:"network_mode"`
+	NetworkMode string `json:"network_mode"`
 	Restrict    Restrict
-	StartWait   uint `toml:"start_wait"`
+	StartWait   uint `json:"start_wait"`
 	Replace     string
-	ReplaceWait uint `toml:"replace_wait"`
+	ReplaceWait uint `json:"replace_wait"`
 }
 
 func (m *Manifest) Validate() error {
@@ -110,13 +111,14 @@ type PortSpec struct {
 	HostPort int64
 }
 
-func (s *PortSpec) UnmarshalText(b []byte) (err error) {
+func (s *PortSpec) UnmarshalJSON(b []byte) (err error) {
+	b = bytes.Trim(b, `"`)
 	items := bytes.Split(b, []byte("->"))
 	if len(items) == 1 {
-		s.Exposed = docker.Port(bytes.Trim(items[0], " "))
+		s.Exposed = docker.Port(bytes.TrimSpace(items[0]))
 	} else {
-		s.Exposed = docker.Port(bytes.Trim(items[1], " "))
-		parts := bytes.Split(bytes.Trim(items[0], " "), []byte{':'})
+		s.Exposed = docker.Port(bytes.TrimSpace(items[1]))
+		parts := bytes.Split(bytes.TrimSpace(items[0]), []byte{':'})
 		if len(parts) == 1 {
 			s.HostPort, err = strconv.ParseInt(string(parts[0]), 10, 64)
 		} else {
@@ -132,13 +134,14 @@ type VolumeSpec struct {
 	Target string
 }
 
-func (s *VolumeSpec) UnmarshalText(b []byte) error {
+func (s *VolumeSpec) UnmarshalJSON(b []byte) error {
+	b = bytes.Trim(b, `"`)
 	items := bytes.Split(b, []byte("->"))
-	s.Path = string(bytes.Trim(items[0], " "))
+	s.Path = string(bytes.TrimSpace(items[0]))
 	if len(items) == 1 {
 		s.Target = s.Path
 	} else {
-		s.Target = string(bytes.Trim(items[1], " "))
+		s.Target = string(bytes.TrimSpace(items[1]))
 	}
 	return nil
 }
@@ -152,7 +155,8 @@ type Link struct {
 	Alias string
 }
 
-func (l *Link) UnmarshalText(b []byte) error {
+func (l *Link) UnmarshalJSON(b []byte) error {
+	b = bytes.Trim(b, `"`)
 	items := bytes.Split(b, []byte(":"))
 	l.Name = string(items[0])
 	if len(items) == 1 {
@@ -189,8 +193,12 @@ func (r *Restrict) Validate() error {
 }
 
 func ParseManifest(path string) (*Manifest, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
 	var m Manifest
-	if _, err := toml.DecodeFile(path, &m); err != nil {
+	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, err
 	}
 	if err := m.Validate(); err != nil {
