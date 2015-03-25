@@ -45,6 +45,23 @@ func (s *ManifestSuite) TestSplitImageTag(c *C) {
 	c.Assert(tag, Equals, "beta")
 }
 
+func (s *ManifestSuite) TestPort(c *C) {
+	m := &Manifest{
+		Ports: []PortSpec{
+			{Exposed: "80/tcp"},
+			{"443/tcp", "", 443},
+		},
+	}
+	c.Assert(m.ExposedPorts(), DeepEquals, map[docker.Port]struct{}{
+		"80/tcp":  struct{}{},
+		"443/tcp": struct{}{},
+	})
+	c.Assert(m.PortBindings(), DeepEquals, map[docker.Port][]docker.PortBinding{
+		"80/tcp":  {{"", "0"}},
+		"443/tcp": {{"", "443"}},
+	})
+}
+
 type PortSpecSuite struct{}
 
 var _ = Suite(&PortSpecSuite{})
