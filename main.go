@@ -62,18 +62,12 @@ func main() {
 			log.Fatal(err)
 		}
 
-		c, err := rpc.Dial("tcp", agent)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer c.Close()
-
 		req := rpc.SubmitRequest{
 			Manifest: m,
 			ExLinks:  exlinks,
 		}
-		var resp rpc.SubmitResponse
-		if err = c.Call("Craft.Submit", req, &resp); err != nil {
+		resp, err := rpc.Submit(agent, req)
+		if err != nil {
 			log.Fatal(err)
 		}
 		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
