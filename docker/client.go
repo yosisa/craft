@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"strings"
@@ -119,17 +118,7 @@ func (c *Client) ImageHash(name, tag string) string {
 }
 
 func (c *Client) PullImage(name, tag string, w io.Writer) error {
-	fmt.Fprint(w, "Pulling image")
-	pr, pw := io.Pipe()
-	defer pw.Close()
-	go func() {
-		s := bufio.NewScanner(pr)
-		for s.Scan() {
-			w.Write([]byte{'.'})
-		}
-		fmt.Fprintln(w, "done")
-	}()
-	opts := docker.PullImageOptions{Repository: name, Tag: tag, OutputStream: pw}
+	opts := docker.PullImageOptions{Repository: name, Tag: tag, OutputStream: w, RawJSONStream: true}
 	auth := docker.AuthConfiguration{}
 	return c.c.PullImage(opts, auth)
 }

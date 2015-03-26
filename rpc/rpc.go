@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/rpc"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -190,6 +189,7 @@ func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		sc, err := net.Dial("tcp", address)
 		if err != nil {
 			log.Print(err)
@@ -199,8 +199,7 @@ func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
 			log.Print(err)
 			return
 		}
-		io.Copy(os.Stdout, sc)
-		wg.Done()
+		showProgress(sc)
 	}()
 
 	var resp SubmitResponse
