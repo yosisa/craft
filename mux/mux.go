@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 type Handler interface {
@@ -56,7 +57,23 @@ func HandleTCP(c net.Conn) {
 	DefaultMux.HandleTCP(c)
 }
 
-func NewClient(c net.Conn, typ byte) (net.Conn, error) {
+func Dial(network, address string, typ byte) (net.Conn, error) {
+	c, err := net.Dial(network, address)
+	if err != nil {
+		return nil, err
+	}
+	return newClient(c, typ)
+}
+
+func DialTimeout(network, address string, typ byte, timeout time.Duration) (net.Conn, error) {
+	c, err := net.DialTimeout(network, address, timeout)
+	if err != nil {
+		return nil, err
+	}
+	return newClient(c, typ)
+}
+
+func newClient(c net.Conn, typ byte) (net.Conn, error) {
 	_, err := c.Write([]byte{typ})
 	if err != nil {
 		return nil, err

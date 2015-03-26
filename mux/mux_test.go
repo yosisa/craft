@@ -3,6 +3,7 @@ package mux
 import (
 	"net"
 	"testing"
+	"time"
 
 	. "gopkg.in/check.v1"
 )
@@ -47,16 +48,14 @@ func (s *MuxSuite) TestServer(c *C) {
 		in = in[:n]
 	}
 
-	conn, err := net.Dial("tcp", ln.Addr().String())
+	conn, err := Dial("tcp", ln.Addr().String(), 0x00)
 	c.Assert(err, IsNil)
-	conn, _ = NewClient(conn, 0x00)
 	conn.Write([]byte("Hello"))
 	read(conn)
 	c.Assert(string(in), Equals, "Hello")
 
-	conn, err = net.Dial("tcp", ln.Addr().String())
+	conn, err = DialTimeout("tcp", ln.Addr().String(), 0x01, time.Second)
 	c.Assert(err, IsNil)
-	conn, _ = NewClient(conn, 0x01)
 	conn.Write([]byte("Hello"))
 	read(conn)
 	c.Assert(string(in), Equals, "HelloHello")

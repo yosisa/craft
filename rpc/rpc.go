@@ -15,6 +15,8 @@ import (
 	"github.com/yosisa/craft/mux"
 )
 
+const dialTimeout = 5 * time.Second
+
 var (
 	agentName string
 	ipAddrs   []string
@@ -169,11 +171,8 @@ func ListenAndServe(c *config.Config) error {
 }
 
 func Dial(network, address string) (*rpc.Client, error) {
-	conn, err := net.DialTimeout(network, address, 5*time.Second)
+	conn, err := mux.DialTimeout(network, address, chanRPC, 5*time.Second)
 	if err != nil {
-		return nil, err
-	}
-	if conn, err = mux.NewClient(conn, chanRPC); err != nil {
 		return nil, err
 	}
 	return rpc.NewClient(conn), nil
@@ -190,12 +189,8 @@ func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		sc, err := net.Dial("tcp", address)
+		sc, err := mux.DialTimeout("tcp", address, chanNewStream, dialTimeout)
 		if err != nil {
-			log.Print(err)
-			return
-		}
-		if sc, err = mux.NewClient(sc, chanNewStream); err != nil {
 			log.Print(err)
 			return
 		}
