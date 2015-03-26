@@ -13,36 +13,51 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docopt/docopt-go"
 	"github.com/dustin/go-humanize"
 	"github.com/yosisa/craft/config"
 	"github.com/yosisa/craft/docker"
 	"github.com/yosisa/craft/rpc"
-	"gopkg.in/alecthomas/kingpin.v1"
 )
 
-var (
-	configPath     = kingpin.Flag("config", "").Short('c').String()
-	agent          = kingpin.Command("agent", "")
-	usage          = kingpin.Command("usage", "")
-	submit         = kingpin.Command("submit", "")
-	submitManifest = submit.Arg("file", "").Required().String()
-	ps             = kingpin.Command("ps", "")
-	psAll          = ps.Flag("all", "").Short('a').Bool()
-)
+var usage = `Docker provisioning tool
+
+Usage:
+  craft [-c FILE] agent
+  craft [-c FILE] usage
+  craft [-c FILE] submit MANIFEST
+  craft [-c FILE] ps [-a]
+  craft -h | --help
+  craft --version
+
+Options:
+  -h --help              Show this screen.
+  --version              Show version.
+  -c FILE --config=FILE  Configuration file.
+  -a --all               List all containers.
+`
 
 func main() {
-	kingpin.Version("0.1.0")
-	cmd := kingpin.Parse()
-	conf, err := config.Parse(*configPath)
+	args, err := docopt.Parse(usage, nil, true, "craft 0.1.0", false)
 	if err != nil {
 		log.Fatal(err)
 	}
-	switch cmd {
-	case agent.FullCommand():
+
+	var configPath string
+	if v, ok := args["--config"].(string); ok {
+		configPath = v
+	}
+	conf, err := config.Parse(configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch {
+	case args["agent"]:
 		if err := rpc.ListenAndServe(conf); err != nil {
 			log.Fatal(err)
 		}
-	case usage.FullCommand():
+	case args["usage"]:
 		c, err := docker.NewClient(conf.Docker)
 		if err != nil {
 			log.Fatal(err)
@@ -52,8 +67,8 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Printf("%+v\n", ui)
-	case submit.FullCommand():
-		m, err := docker.ParseManifest(*submitManifest)
+	case args["submit"]:
+		m, err := docker.ParseManifest(args["MANIFEST"].(string))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -77,9 +92,9 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
-	case ps.FullCommand():
+	case args["ps"]:
 		containers := rpc.CallAll(conf.Agents, func(c *nrpc.Client) (interface{}, error) {
-			req := rpc.ListContainersRequest{All: *psAll}
+			req := rpc.ListContainersRequest{All: args["--all"].(bool)}
 			var resp rpc.ListContainersResponse
 			err := c.Call("Docker.ListContainers", req, &resp)
 			return &resp, err
