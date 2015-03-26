@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	nrpc "net/rpc"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/yosisa/craft/config"
 	"github.com/yosisa/craft/docker"
 	"github.com/yosisa/craft/rpc"
@@ -22,6 +26,8 @@ var (
 	usage          = kingpin.Command("usage", "")
 	submit         = kingpin.Command("submit", "")
 	submitManifest = submit.Arg("file", "").Required().String()
+	ps             = kingpin.Command("ps", "")
+	psAll          = ps.Flag("all", "").Short('a').Bool()
 )
 
 func main() {
@@ -71,6 +77,44 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
+	case ps.FullCommand():
+		containers := rpc.CallAll(conf.Agents, func(c *nrpc.Client) (interface{}, error) {
+			req := rpc.ListContainersRequest{All: *psAll}
+			var resp rpc.ListContainersResponse
+			err := c.Call("Docker.ListContainers", req, &resp)
+			return &resp, err
+		})
+		for agent, resp := range containers {
+			cons := resp.(*rpc.ListContainersResponse).Containers
+			var nn, ni, nc, ns int
+			for _, c := range cons {
+				if n := len(docker.CanonicalName(c.Names)); n > nn {
+					nn = n
+				}
+				if n := len(c.Image); n > ni {
+					ni = n
+				}
+				if n := len(humanize.Time(time.Unix(c.Created, 0))); n > nc {
+					nc = n
+				}
+				if n := len(c.Status); n > ns {
+					ns = n
+				}
+			}
+			fmt.Printf("[%s]\n", agent)
+			s := "  %-15s%-" + strconv.Itoa(nn+3) + "s%-" + strconv.Itoa(ni+3) +
+				"s%-23s%-" + strconv.Itoa(nc+3) + "s%-" + strconv.Itoa(ns+3) + "s%s\n"
+			fmt.Printf(s, "CONTAINER ID", "NAME", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS")
+			for _, c := range cons {
+				cmd := c.Command
+				if len(cmd) > 20 {
+					cmd = cmd[:20]
+				}
+				fmt.Printf(s, c.ID[:12], docker.CanonicalName(c.Names), c.Image, cmd,
+					humanize.Time(time.Unix(c.Created, 0)), c.Status, docker.FormatPorts(c.Ports))
+			}
+			fmt.Println()
+		}
 	}
 }
 

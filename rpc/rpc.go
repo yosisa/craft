@@ -148,6 +148,13 @@ func ListenAndServe(c *config.Config) error {
 	}
 	craft.lc <- struct{}{}
 	rpc.Register(craft)
+
+	d, err := NewDocker(c.Docker)
+	if err != nil {
+		return err
+	}
+	rpc.Register(d)
+
 	mux.Handle(chanRPC, mux.HandlerFunc(func(c net.Conn) {
 		rpc.ServeConn(c)
 	}))
@@ -204,4 +211,30 @@ func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
 		return nil, err
 	}
 	return &resp, err
+}
+
+func CallAll(addrs []string, f func(c *rpc.Client) (interface{}, error)) map[string]interface{} {
+	var wg sync.WaitGroup
+	wg.Add(len(addrs))
+	out := make(map[string]interface{})
+	for _, addr := range addrs {
+		go func(addr string) {
+			defer wg.Done()
+			c, err := Dial("tcp", addr)
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			defer c.Close()
+
+			resp, err := f(c)
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			out[addr] = resp
+		}(addr)
+	}
+	wg.Wait()
+	return out
 }

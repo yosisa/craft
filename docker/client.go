@@ -40,7 +40,7 @@ func (c *Client) Usage() (*UsageInfo, error) {
 	var ui UsageInfo
 	ui.Containers = make(map[string]*ContainerInfo)
 	for _, c := range cons {
-		name := canonicalName(c.Names)
+		name := CanonicalName(c.Names)
 		ui.AllNames = append(ui.AllNames, name)
 		if !strings.HasPrefix(c.Status, "Up") {
 			continue
@@ -147,7 +147,7 @@ func (c *Client) Remove(name string, wait uint) error {
 	return err
 }
 
-func canonicalName(ss []string) string {
+func CanonicalName(ss []string) string {
 	for _, s := range ss {
 		s = s[1:]
 		if !strings.Contains(s, "/") {
@@ -155,4 +155,16 @@ func canonicalName(ss []string) string {
 		}
 	}
 	return ""
+}
+
+func FormatPorts(ports []docker.APIPort) string {
+	var s []string
+	for _, p := range ports {
+		if p.IP == "" {
+			s = append(s, fmt.Sprintf("%d/%s", p.PrivatePort, p.Type))
+		} else {
+			s = append(s, fmt.Sprintf("%s:%d->%d/%s", p.IP, p.PublicPort, p.PrivatePort, p.Type))
+		}
+	}
+	return strings.Join(s, ", ")
 }
