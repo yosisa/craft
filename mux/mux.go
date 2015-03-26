@@ -46,24 +46,6 @@ func (m *Mux) HandleTCP(c net.Conn) {
 	c.Close()
 }
 
-type typeWriter struct {
-	net.Conn
-	typ     byte
-	typSent bool
-}
-
-func (w *typeWriter) Write(b []byte) (n int, err error) {
-	if !w.typSent {
-		n, err = w.Conn.Write([]byte{w.typ})
-		w.typSent = true
-		if err != nil {
-			return
-		}
-	}
-	nn, err := w.Conn.Write(b)
-	return nn + n, err
-}
-
 var DefaultMux = &Mux{}
 
 func Handle(typ byte, h Handler) {
@@ -74,6 +56,10 @@ func HandleTCP(c net.Conn) {
 	DefaultMux.HandleTCP(c)
 }
 
-func NewClient(c net.Conn, typ byte) net.Conn {
-	return &typeWriter{Conn: c, typ: typ}
+func NewClient(c net.Conn, typ byte) (net.Conn, error) {
+	_, err := c.Write([]byte{typ})
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }

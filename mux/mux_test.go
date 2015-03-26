@@ -49,14 +49,14 @@ func (s *MuxSuite) TestServer(c *C) {
 
 	conn, err := net.Dial("tcp", ln.Addr().String())
 	c.Assert(err, IsNil)
-	conn = NewClient(conn, 0x00)
+	conn, _ = NewClient(conn, 0x00)
 	conn.Write([]byte("Hello"))
 	read(conn)
 	c.Assert(string(in), Equals, "Hello")
 
 	conn, err = net.Dial("tcp", ln.Addr().String())
 	c.Assert(err, IsNil)
-	conn = NewClient(conn, 0x01)
+	conn, _ = NewClient(conn, 0x01)
 	conn.Write([]byte("Hello"))
 	read(conn)
 	c.Assert(string(in), Equals, "HelloHello")
