@@ -173,9 +173,17 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 
 	// Agent name restriction
 	if m.Restrict.Agent != "" {
-		re, _ := regexp.Compile(m.Restrict.Agent)
+		re := regexp.MustCompile(m.Restrict.Agent)
 		caps.Filter(func(cap *rpc.Capability) bool {
 			return re.MatchString(cap.Agent)
+		})
+	}
+
+	// Conflicts restriction
+	for _, conflict := range m.Restrict.Conflicts {
+		re := regexp.MustCompile(conflict)
+		caps.Filter(func(cap *rpc.Capability) bool {
+			return !stringSlice(cap.UsedNames).Match(re)
 		})
 	}
 
@@ -235,6 +243,15 @@ type stringSlice []string
 func (ss stringSlice) Contains(s string) bool {
 	for _, v := range ss {
 		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func (ss stringSlice) Match(re *regexp.Regexp) bool {
+	for _, v := range ss {
+		if re.MatchString(v) {
 			return true
 		}
 	}

@@ -182,12 +182,18 @@ func (e Env) Pairs() []string {
 }
 
 type Restrict struct {
-	Agent string
+	Agent     string
+	Conflicts []string
 }
 
 func (r *Restrict) Validate() error {
 	if _, err := regexp.Compile(r.Agent); err != nil {
 		return err
+	}
+	for _, c := range r.Conflicts {
+		if _, err := regexp.Compile(c); err != nil {
+			return err
+		}
 	}
 	return nil
 }
