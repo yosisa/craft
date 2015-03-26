@@ -26,7 +26,7 @@ Usage:
   craft [-c FILE] agent
   craft [-c FILE] usage
   craft [-c FILE] submit MANIFEST
-  craft [-c FILE] ps [-a]
+  craft [-c FILE] ps [-a] [--full]
   craft -h | --help
   craft --version
 
@@ -35,6 +35,7 @@ Options:
   --version              Show version.
   -c FILE --config=FILE  Configuration file.
   -a --all               List all containers.
+  --full                 Show full command.
 `
 
 func main() {
@@ -101,7 +102,7 @@ func main() {
 		})
 		for agent, resp := range containers {
 			cons := resp.(*rpc.ListContainersResponse).Containers
-			var nn, ni, nc, ns int
+			var nn, ni, nc, nt, ns int
 			for _, c := range cons {
 				if n := len(docker.CanonicalName(c.Names)); n > nn {
 					nn = n
@@ -109,20 +110,26 @@ func main() {
 				if n := len(c.Image); n > ni {
 					ni = n
 				}
-				if n := len(humanize.Time(time.Unix(c.Created, 0))); n > nc {
+				if n := len(c.Command); n > nc {
 					nc = n
+				}
+				if n := len(humanize.Time(time.Unix(c.Created, 0))); n > nt {
+					nt = n
 				}
 				if n := len(c.Status); n > ns {
 					ns = n
 				}
 			}
+			if nc > 20 && !args["--full"].(bool) {
+				nc = 20
+			}
 			fmt.Printf("[%s]\n", agent)
-			s := "  %-15s%-" + strconv.Itoa(nn+3) + "s%-" + strconv.Itoa(ni+3) +
-				"s%-23s%-" + strconv.Itoa(nc+3) + "s%-" + strconv.Itoa(ns+3) + "s%s\n"
+			s := "  %-15s%-" + strconv.Itoa(nn+3) + "s%-" + strconv.Itoa(ni+3) + "s%-" +
+				strconv.Itoa(nc+3) + "s%-" + strconv.Itoa(nt+3) + "s%-" + strconv.Itoa(ns+3) + "s%s\n"
 			fmt.Printf(s, "CONTAINER ID", "NAME", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS")
 			for _, c := range cons {
 				cmd := c.Command
-				if len(cmd) > 20 {
+				if len(cmd) > 20 && !args["--full"].(bool) {
 					cmd = cmd[:20]
 				}
 				fmt.Printf(s, c.ID[:12], docker.CanonicalName(c.Names), c.Image, cmd,
