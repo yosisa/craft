@@ -5,14 +5,20 @@ import (
 	"net"
 	"net/rpc"
 	"strings"
+	"time"
 
 	"github.com/yosisa/craft/config"
 	"github.com/yosisa/craft/docker"
+	"github.com/yosisa/craft/mux"
 )
 
 var (
 	agentName string
 	ipAddrs   []string
+)
+
+const (
+	chanRPC byte = iota
 )
 
 type Empty struct{}
@@ -131,6 +137,9 @@ func ListenAndServe(c *config.Config) error {
 	}
 	craft.lc <- struct{}{}
 	rpc.Register(craft)
+	mux.Handle(chanRPC, mux.HandlerFunc(func(c net.Conn) {
+		rpc.ServeConn(c)
+	}))
 
 	ln, err := net.Listen("tcp", c.Listen)
 	if err != nil {
@@ -142,11 +151,15 @@ func ListenAndServe(c *config.Config) error {
 			fmt.Println(err)
 			continue
 		}
-		rpc.ServeConn(conn)
+		go mux.HandleTCP(conn)
 	}
 	return nil
 }
 
 func Dial(network, address string) (*rpc.Client, error) {
-	return rpc.Dial(network, address)
+	conn, err := net.DialTimeout(network, address, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return rpc.NewClient(mux.NewClient(conn, chanRPC)), nil
 }
