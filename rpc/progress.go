@@ -2,10 +2,10 @@ package rpc
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
-	"os"
 
 	"github.com/nsf/termbox-go"
 )
@@ -17,23 +17,9 @@ type jsonMessage struct {
 }
 
 func showProgress(c net.Conn) {
-	if err := termbox.Init(); err != nil {
-		io.Copy(os.Stdout, c)
-		return
-	}
-	defer termbox.Close()
-
 	var ids []string
 	progress := make(map[string]string)
-	dec := json.NewDecoder(c)
-	for {
-		var msg jsonMessage
-		if err := dec.Decode(&msg); err != nil {
-			if err != io.EOF {
-				log.Print(err)
-			}
-			return
-		}
+	update := func(msg *jsonMessage) {
 		if _, ok := progress[msg.ID]; !ok {
 			ids = append(ids, msg.ID)
 		}
@@ -47,5 +33,28 @@ func showProgress(c net.Conn) {
 			}
 		}
 		termbox.Flush()
+	}
+
+	first := true
+	dec := json.NewDecoder(c)
+	for {
+		var msg jsonMessage
+		if err := dec.Decode(&msg); err != nil {
+			if err != io.EOF {
+				log.Print(err)
+			}
+			return
+		}
+		if first {
+			first = false
+			if err := termbox.Init(); err == nil {
+				defer termbox.Close()
+			} else {
+				update = func(msg *jsonMessage) {
+					fmt.Fprintln(c, msg.Progress)
+				}
+			}
+		}
+		update(&msg)
 	}
 }
