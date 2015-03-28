@@ -18,8 +18,9 @@ import (
 const dialTimeout = 5 * time.Second
 
 var (
-	agentName string
-	ipAddrs   []string
+	agentName    string
+	ipAddrs      []string
+	streamWriter = make(chan io.WriteCloser)
 )
 
 const (
@@ -71,9 +72,8 @@ type SubmitResponse struct {
 }
 
 type Craft struct {
-	c      *docker.Client
-	lc     chan struct{}
-	stream chan io.WriteCloser
+	c  *docker.Client
+	lc chan struct{}
 }
 
 func (c *Craft) Capability(req Empty, resp *Capability) error {
@@ -99,7 +99,7 @@ func (c *Craft) Capability(req Empty, resp *Capability) error {
 func (c *Craft) Submit(req SubmitRequest, resp *SubmitResponse) error {
 	c.lock()
 	defer c.unlock()
-	w := <-c.stream
+	w := <-streamWriter
 	defer w.Close()
 
 	for _, exl := range req.ExLinks {
@@ -142,9 +142,8 @@ func ListenAndServe(c *config.Config) error {
 		return err
 	}
 	craft := &Craft{
-		c:      client,
-		lc:     make(chan struct{}, 1),
-		stream: make(chan io.WriteCloser),
+		c:  client,
+		lc: make(chan struct{}, 1),
 	}
 	craft.lc <- struct{}{}
 	rpc.Register(craft)
@@ -159,7 +158,7 @@ func ListenAndServe(c *config.Config) error {
 		rpc.ServeConn(c)
 	}))
 	mux.Handle(chanNewStream, mux.HandlerFunc(func(c net.Conn) {
-		craft.stream <- c
+		streamWriter <- c
 	}))
 
 	ln, err := net.Listen("tcp", c.Listen)
@@ -212,7 +211,7 @@ func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
 	return &resp, err
 }
 
-func CallAll(addrs []string, f func(c *rpc.Client) (interface{}, error)) map[string]interface{} {
+func CallAll(addrs []string, f func(c *rpc.Client, addr string) (interface{}, error)) map[string]interface{} {
 	var wg sync.WaitGroup
 	wg.Add(len(addrs))
 	out := make(map[string]interface{})
@@ -226,7 +225,7 @@ func CallAll(addrs []string, f func(c *rpc.Client) (interface{}, error)) map[str
 			}
 			defer c.Close()
 
-			resp, err := f(c)
+			resp, err := f(c, addr)
 			if err != nil {
 				log.Print(err)
 				return

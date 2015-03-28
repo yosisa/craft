@@ -16,23 +16,19 @@ type ManifestSuite struct{}
 var _ = Suite(&ManifestSuite{})
 
 func (s *ManifestSuite) TestSplitImageTag(c *C) {
-	m := &Manifest{Image: "go"}
-	image, tag := m.SplitImageTag()
+	image, tag := SplitImageTag("go")
 	c.Assert(image, Equals, "go")
 	c.Assert(tag, Equals, "latest")
 
-	m = &Manifest{Image: "go:1.4"}
-	image, tag = m.SplitImageTag()
+	image, tag = SplitImageTag("go:1.4")
 	c.Assert(image, Equals, "go")
 	c.Assert(tag, Equals, "1.4")
 
-	m = &Manifest{Image: "localhost:5000/myimage"}
-	image, tag = m.SplitImageTag()
+	image, tag = SplitImageTag("localhost:5000/myimage")
 	c.Assert(image, Equals, "localhost:5000/myimage")
 	c.Assert(tag, Equals, "latest")
 
-	m = &Manifest{Image: "localhost:5000/myimage:beta"}
-	image, tag = m.SplitImageTag()
+	image, tag = SplitImageTag("localhost:5000/myimage:beta")
 	c.Assert(image, Equals, "localhost:5000/myimage")
 	c.Assert(tag, Equals, "beta")
 }

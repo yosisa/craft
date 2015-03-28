@@ -47,14 +47,6 @@ func (m *Manifest) Validate() error {
 	return m.Restrict.Validate()
 }
 
-func (m *Manifest) SplitImageTag() (string, string) {
-	g := validImageTag.FindStringSubmatch(m.Image)
-	if g[2] != "" {
-		return g[1], g[2][1:]
-	}
-	return g[1], "latest"
-}
-
 func (m *Manifest) ExposedPorts() map[docker.Port]struct{} {
 	if len(m.Ports) == 0 {
 		return nil
@@ -211,4 +203,12 @@ func ParseManifest(path string) (*Manifest, error) {
 		return nil, err
 	}
 	return &m, nil
+}
+
+func SplitImageTag(image string) (string, string) {
+	g := validImageTag.FindStringSubmatch(image)
+	if g[2] != "" {
+		return g[1], g[2][1:]
+	}
+	return g[1], "latest"
 }

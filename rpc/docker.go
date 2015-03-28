@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"github.com/fsouza/go-dockerclient"
+	cdocker "github.com/yosisa/craft/docker"
 )
 
 type Docker struct {
@@ -31,4 +32,22 @@ func (d *Docker) ListContainers(req ListContainersRequest, resp *ListContainersR
 	}
 	resp.Containers = cons
 	return nil
+}
+
+type PullImageRequest struct {
+	Image string
+}
+
+func (d *Docker) PullImage(req PullImageRequest, resp *Empty) error {
+	w := <-streamWriter
+	defer w.Close()
+	image, tag := cdocker.SplitImageTag(req.Image)
+	opts := docker.PullImageOptions{
+		Repository:    image,
+		Tag:           tag,
+		OutputStream:  w,
+		RawJSONStream: true,
+	}
+	auth := docker.AuthConfiguration{}
+	return d.c.PullImage(opts, auth)
 }

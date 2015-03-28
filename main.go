@@ -27,6 +27,7 @@ Usage:
   craft [-c FILE] usage
   craft [-c FILE] submit MANIFEST
   craft [-c FILE] ps [-a] [--full]
+  craft [-c FILE] pull IMAGE
   craft -h | --help
   craft --version
 
@@ -94,7 +95,7 @@ func main() {
 		}
 		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
 	case args["ps"]:
-		containers := rpc.CallAll(conf.Agents, func(c *nrpc.Client) (interface{}, error) {
+		containers := rpc.CallAll(conf.Agents, func(c *nrpc.Client, addr string) (interface{}, error) {
 			req := rpc.ListContainersRequest{All: args["--all"].(bool)}
 			var resp rpc.ListContainersResponse
 			err := c.Call("Docker.ListContainers", req, &resp)
@@ -137,6 +138,8 @@ func main() {
 			}
 			fmt.Println()
 		}
+	case args["pull"]:
+		rpc.PullImage(conf.Agents, args["IMAGE"].(string))
 	}
 }
 

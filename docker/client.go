@@ -65,7 +65,7 @@ func (c *Client) Usage() (*UsageInfo, error) {
 }
 
 func (c *Client) Run(m *Manifest, w io.Writer) error {
-	image, tag := m.SplitImageTag()
+	image, tag := SplitImageTag(m.Image)
 	if hash := c.ImageHash(image, tag); hash == "" || !strings.HasPrefix(hash, m.ImageHash) {
 		if err := c.PullImage(image, tag, w); err != nil {
 			return err
