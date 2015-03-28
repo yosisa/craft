@@ -192,21 +192,20 @@ func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
 	}
 	defer c.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	p := newProgress()
+	go p.show()
 	go func() {
-		defer wg.Done()
 		sc, err := mux.DialTimeout("tcp", address, chanNewStream, dialTimeout)
 		if err != nil {
 			log.Print(err)
 			return
 		}
-		showProgress(sc)
+		p.add(sc, address)
 	}()
 
 	var resp SubmitResponse
 	err = c.Call("Craft.Submit", req, &resp)
-	wg.Wait()
+	p.wait()
 	if err != nil {
 		return nil, err
 	}
