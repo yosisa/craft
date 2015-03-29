@@ -28,6 +28,7 @@ Usage:
   craft [-c FILE] submit MANIFEST
   craft [-c FILE] ps [-a] [--full]
   craft [-c FILE] rm [-f] CONTAINER
+  craft [-c FILE] logs [--follow] [--tail=NUM] CONTAINER
   craft [-c FILE] pull IMAGE
   craft [-c FILE] restart [-t TIMEOUT] CONTAINER
   craft [-c FILE] start CONTAINER
@@ -42,6 +43,8 @@ Options:
   -a --all                   List all containers.
   --full                     Show full command.
   -f                         Force remove.
+  --follow                   Follow logs.
+  --tail=NUM                 Number of recent logs [default: all].
   -t TIMEOUT --time=TIMEOUT  Wait for the container to stop in seconds [default: 10].
 `
 
@@ -167,6 +170,9 @@ func main() {
 		logRPCError(err)
 	case args["pull"]:
 		err := rpc.PullImage(conf.Agents, args["IMAGE"].(string))
+		logRPCError(err)
+	case args["logs"]:
+		err := rpc.Logs(conf.Agents, args["CONTAINER"].(string), args["--follow"].(bool), args["--tail"].(string))
 		logRPCError(err)
 	}
 }

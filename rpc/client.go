@@ -1,10 +1,17 @@
 package rpc
 
 import (
+	"bufio"
 	"encoding/binary"
+	"fmt"
+	"io"
 	"net"
 	"net/rpc"
+	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/yosisa/craft/mux"
@@ -98,6 +105,105 @@ func PullImage(addrs []string, image string) error {
 	})
 	p.wait()
 	return err
+}
+
+func Logs(addrs []string, container string, follow bool, tail string) error {
+	dstout := newLogWriter(os.Stdout)
+	dsterr := newLogWriter(os.Stderr)
+	closed := make(chan struct{})
+	if follow {
+		go func() {
+			sig := make(chan os.Signal)
+			signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+			<-sig
+			signal.Stop(sig)
+			close(sig)
+			close(closed)
+			dstout.close()
+			dsterr.close()
+		}()
+	}
+
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		oid, osc, err := AllocStream(c, addr)
+		if err != nil {
+			return nil, err
+		}
+		eid, esc, err := AllocStream(c, addr)
+		if err != nil {
+			return nil, err
+		}
+		go dstout.read(fmt.Sprintf("[%s] ", addr), osc)
+		go dsterr.read(fmt.Sprintf("[%s] ", addr), esc)
+
+		req := LogsRequest{
+			Container:   container,
+			OutStreamID: oid,
+			ErrStreamID: eid,
+			Follow:      follow,
+			Tail:        tail,
+		}
+		select {
+		// rpc call never return if follow is true
+		case call := <-c.Go("Docker.Logs", req, &Empty{}, nil).Done:
+			return nil, safeError(call.Error)
+		case <-closed:
+			return nil, nil
+		}
+	})
+	dstout.wait()
+	dsterr.wait()
+	return err
+}
+
+type logWriter struct {
+	c  chan string
+	wg sync.WaitGroup
+	rs []io.ReadCloser
+	m  sync.Mutex
+}
+
+func newLogWriter(w io.Writer) *logWriter {
+	lw := &logWriter{
+		c: make(chan string),
+	}
+	go lw.write(w)
+	return lw
+}
+
+func (l *logWriter) write(w io.Writer) {
+	for s := range l.c {
+		fmt.Fprintln(w, s)
+	}
+}
+
+func (l *logWriter) read(prefix string, r io.ReadCloser) {
+	l.m.Lock()
+	l.rs = append(l.rs, r)
+	l.m.Unlock()
+
+	l.wg.Add(1)
+	defer l.wg.Done()
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		l.c <- prefix + s.Text()
+	}
+	if err := s.Err(); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		log.WithField("error", err).Error("Failed to read log stream")
+	}
+}
+
+func (l *logWriter) wait() {
+	l.wg.Wait()
+	close(l.c)
+}
+
+func (l *logWriter) close() {
+	l.m.Lock()
+	defer l.m.Unlock()
+	for _, r := range l.rs {
+		r.Close()
+	}
 }
 
 func safeError(err error) error {

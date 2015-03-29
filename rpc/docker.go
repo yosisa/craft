@@ -89,3 +89,33 @@ func (d *Docker) PullImage(req PullImageRequest, resp *Empty) error {
 	auth := docker.AuthConfiguration{}
 	return d.c.PullImage(opts, auth)
 }
+
+type LogsRequest struct {
+	Container   string
+	Follow      bool
+	Tail        string
+	OutStreamID uint32
+	ErrStreamID uint32
+}
+
+func (d *Docker) Logs(req LogsRequest, resp *Empty) error {
+	oc, err := streamConn.get(req.OutStreamID)
+	if err != nil {
+		return err
+	}
+	defer oc.Close()
+	ec, err := streamConn.get(req.ErrStreamID)
+	if err != nil {
+		return err
+	}
+	defer ec.Close()
+	return d.c.Logs(docker.LogsOptions{
+		Container:    req.Container,
+		OutputStream: oc,
+		ErrorStream:  ec,
+		Follow:       req.Follow,
+		Stdout:       true,
+		Stderr:       true,
+		Tail:         req.Tail,
+	})
+}
