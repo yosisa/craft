@@ -34,6 +34,10 @@ func (d *Docker) ListContainers(req ListContainersRequest, resp *ListContainersR
 	return nil
 }
 
+func (d *Docker) StartContainer(req string, resp *Empty) error {
+	return d.c.StartContainer(req, nil)
+}
+
 type RemoveContainerRequest struct {
 	ID    string
 	Force bool

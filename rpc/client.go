@@ -23,6 +23,17 @@ func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err erro
 	return
 }
 
+func StartContainer(addrs []string, container string) error {
+	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		err := c.Call("Docker.StartContainer", container, &Empty{})
+		if err != nil && strings.Contains(err.Error(), "No such container") {
+			err = nil
+		}
+		return nil, err
+	})
+	return nil
+}
+
 func RemoveContainer(addrs []string, container string, force bool) error {
 	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := RemoveContainerRequest{ID: container, Force: force}

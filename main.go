@@ -29,6 +29,7 @@ Usage:
   craft [-c FILE] ps [-a] [--full]
   craft [-c FILE] rm [-f] CONTAINER
   craft [-c FILE] pull IMAGE
+  craft [-c FILE] start CONTAINER
   craft -h | --help
   craft --version
 
@@ -138,6 +139,8 @@ func main() {
 		}
 	case args["rm"]:
 		rpc.RemoveContainer(conf.Agents, args["CONTAINER"].(string), args["-f"].(bool))
+	case args["start"]:
+		rpc.StartContainer(conf.Agents, args["CONTAINER"].(string))
 	case args["pull"]:
 		rpc.PullImage(conf.Agents, args["IMAGE"].(string))
 	}
