@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	nrpc "net/rpc"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -28,6 +30,7 @@ Usage:
   craft [-c FILE] submit MANIFEST
   craft [-c FILE] ps [-a] [--full]
   craft [-c FILE] rm [-f] CONTAINER
+  craft [-c FILE] load [-i FILE]
   craft [-c FILE] logs [--follow] [--tail=NUM] CONTAINER
   craft [-c FILE] pull IMAGE
   craft [-c FILE] restart [-t TIMEOUT] CONTAINER
@@ -44,6 +47,7 @@ Options:
   --full                     Show full command.
   -f                         Force remove.
   --follow                   Follow logs.
+  -i FILE --input=FILE       Input file [default: -].
   --tail=NUM                 Number of recent logs [default: all].
   -t TIMEOUT --time=TIMEOUT  Wait for the container to stop in seconds [default: 10].
 `
@@ -173,6 +177,17 @@ func main() {
 		logRPCError(err)
 	case args["logs"]:
 		err := rpc.Logs(conf.Agents, args["CONTAINER"].(string), args["--follow"].(bool), args["--tail"].(string))
+		logRPCError(err)
+	case args["load"]:
+		var r io.Reader
+		if path := args["--input"].(string); path == "-" {
+			r = os.Stdin
+		} else {
+			if r, err = os.Open(path); err != nil {
+				log.WithField("error", err).Fatal("Could not open input file")
+			}
+		}
+		err := rpc.LoadImage(conf.Agents, r)
 		logRPCError(err)
 	}
 }

@@ -119,3 +119,11 @@ func (d *Docker) Logs(req LogsRequest, resp *Empty) error {
 		Tail:         req.Tail,
 	})
 }
+
+func (d *Docker) LoadImage(req uint32, resp *Empty) error {
+	c, err := streamConn.get(req)
+	if err != nil {
+		return err
+	}
+	return d.c.LoadImage(docker.LoadImageOptions{InputStream: c})
+}

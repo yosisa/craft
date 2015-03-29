@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
@@ -153,6 +154,38 @@ func Logs(addrs []string, container string, follow bool, tail string) error {
 	})
 	dstout.wait()
 	dsterr.wait()
+	return err
+}
+
+func LoadImage(addrs []string, r io.Reader) error {
+	n := int32(len(addrs))
+	queue := make(chan net.Conn, len(addrs))
+	ready := func() {
+		if atomic.AddInt32(&n, -1) == 0 {
+			close(queue)
+		}
+	}
+	go func() {
+		var ws []io.Writer
+		for c := range queue {
+			ws = append(ws, c)
+			defer c.Close()
+		}
+		w := io.MultiWriter(ws...)
+		io.Copy(w, r)
+	}()
+
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		id, sc, err := AllocStream(c, addr)
+		if err != nil {
+			ready()
+			return nil, err
+		}
+		queue <- sc
+		ready()
+		err = c.Call("Docker.LoadImage", id, &Empty{})
+		return nil, err
+	})
 	return err
 }
 
