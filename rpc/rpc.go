@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/rpc"
@@ -18,9 +17,8 @@ import (
 const dialTimeout = 5 * time.Second
 
 var (
-	agentName    string
-	ipAddrs      []string
-	streamWriter = make(chan io.WriteCloser)
+	agentName string
+	ipAddrs   []string
 )
 
 const (
@@ -43,6 +41,7 @@ type Capability struct {
 type SubmitRequest struct {
 	Manifest *docker.Manifest
 	ExLinks  []*ExLink
+	StreamID uint32
 }
 
 type ExLink struct {
@@ -99,7 +98,10 @@ func (c *Craft) Capability(req Empty, resp *Capability) error {
 func (c *Craft) Submit(req SubmitRequest, resp *SubmitResponse) error {
 	c.lock()
 	defer c.unlock()
-	w := <-streamWriter
+	w, err := streamConn.get(req.StreamID)
+	if err != nil {
+		return err
+	}
 	defer w.Close()
 
 	for _, exl := range req.ExLinks {
@@ -153,12 +155,16 @@ func ListenAndServe(c *config.Config) error {
 		return err
 	}
 	rpc.Register(d)
+	rpc.Register(streamConn)
 
 	mux.Handle(chanRPC, mux.HandlerFunc(func(c net.Conn) {
 		rpc.ServeConn(c)
 	}))
 	mux.Handle(chanNewStream, mux.HandlerFunc(func(c net.Conn) {
-		streamWriter <- c
+		if err := streamConn.put(c); err != nil {
+			log.Print(err)
+			c.Close()
+		}
 	}))
 
 	ln, err := net.Listen("tcp", c.Listen)
@@ -184,24 +190,27 @@ func Dial(network, address string) (*rpc.Client, error) {
 	return rpc.NewClient(conn), nil
 }
 
-func Submit(address string, req SubmitRequest) (*SubmitResponse, error) {
+func Submit(address string, m *docker.Manifest, exlinks []*ExLink) (*SubmitResponse, error) {
 	c, err := Dial("tcp", address)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
 
+	id, sc, err := AllocStream(c, address)
+	if err != nil {
+		return nil, err
+	}
+
 	p := newProgress()
 	go p.show()
-	go func() {
-		sc, err := mux.DialTimeout("tcp", address, chanNewStream, dialTimeout)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-		p.add(sc, address)
-	}()
+	p.add(sc, address)
 
+	req := SubmitRequest{
+		Manifest: m,
+		ExLinks:  exlinks,
+		StreamID: id,
+	}
 	var resp SubmitResponse
 	err = c.Call("Craft.Submit", req, &resp)
 	p.wait()

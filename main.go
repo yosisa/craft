@@ -85,11 +85,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		req := rpc.SubmitRequest{
-			Manifest: m,
-			ExLinks:  exlinks,
-		}
-		resp, err := rpc.Submit(agent, req)
+		resp, err := rpc.Submit(agent, m, exlinks)
 		if err != nil {
 			log.Fatal(err)
 		}

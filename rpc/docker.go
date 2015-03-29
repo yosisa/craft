@@ -35,11 +35,15 @@ func (d *Docker) ListContainers(req ListContainersRequest, resp *ListContainersR
 }
 
 type PullImageRequest struct {
-	Image string
+	Image    string
+	StreamID uint32
 }
 
 func (d *Docker) PullImage(req PullImageRequest, resp *Empty) error {
-	w := <-streamWriter
+	w, err := streamConn.get(req.StreamID)
+	if err != nil {
+		return err
+	}
 	defer w.Close()
 	image, tag := cdocker.SplitImageTag(req.Image)
 	opts := docker.PullImageOptions{
