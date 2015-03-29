@@ -25,10 +25,7 @@ func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err erro
 
 func StartContainer(addrs []string, container string) error {
 	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
-		err := c.Call("Docker.StartContainer", container, &Empty{})
-		if err != nil && strings.Contains(err.Error(), "No such container") {
-			err = nil
-		}
+		err := safeError(c.Call("Docker.StartContainer", container, &Empty{}))
 		return nil, err
 	})
 	return nil
@@ -37,10 +34,7 @@ func StartContainer(addrs []string, container string) error {
 func StopContainer(addrs []string, container string, timeout uint) error {
 	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := StopContainerRequest{ID: container, Timeout: timeout}
-		err := c.Call("Docker.StopContainer", req, &Empty{})
-		if err != nil && strings.Contains(err.Error(), "No such container") {
-			err = nil
-		}
+		err := safeError(c.Call("Docker.StopContainer", req, &Empty{}))
 		return nil, err
 	})
 	return nil
@@ -49,10 +43,7 @@ func StopContainer(addrs []string, container string, timeout uint) error {
 func RemoveContainer(addrs []string, container string, force bool) error {
 	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := RemoveContainerRequest{ID: container, Force: force}
-		err := c.Call("Docker.RemoveContainer", req, &Empty{})
-		if err != nil && strings.HasPrefix(err.Error(), "No such container:") {
-			err = nil
-		}
+		err := safeError(c.Call("Docker.RemoveContainer", req, &Empty{}))
 		return nil, err
 	})
 	return nil
@@ -75,4 +66,11 @@ func PullImage(addrs []string, image string) error {
 	})
 	p.wait()
 	return nil
+}
+
+func safeError(err error) error {
+	if err != nil && strings.Contains(err.Error(), "No such container") {
+		return nil
+	}
+	return err
 }
