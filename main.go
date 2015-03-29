@@ -103,7 +103,12 @@ func main() {
 			return &resp, err
 		})
 		for agent, resp := range containers {
+			fmt.Printf("[%s]\n", agent)
 			cons := resp.(*rpc.ListContainersResponse).Containers
+			if len(cons) == 0 {
+				fmt.Println()
+				continue
+			}
 			var nn, ni, nc, nt, ns int
 			for _, c := range cons {
 				if n := len(docker.CanonicalName(c.Names)); n > nn {
@@ -125,7 +130,6 @@ func main() {
 			if nc > 20 && !args["--full"].(bool) {
 				nc = 20
 			}
-			fmt.Printf("[%s]\n", agent)
 			s := "  %-15s%-" + strconv.Itoa(nn+3) + "s%-" + strconv.Itoa(ni+3) + "s%-" +
 				strconv.Itoa(nc+3) + "s%-" + strconv.Itoa(nt+3) + "s%-" + strconv.Itoa(ns+3) + "s%s\n"
 			fmt.Printf(s, "CONTAINER ID", "NAME", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS")
