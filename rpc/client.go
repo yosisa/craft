@@ -52,6 +52,21 @@ func StopContainer(addrs []string, container string, timeout uint) error {
 	return err
 }
 
+func RestartContainer(addrs []string, container string, timeout uint) error {
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		req := RestartContainerRequest{ID: container, Timeout: timeout}
+		err := c.Call("Docker.RestartContainer", req, &Empty{})
+		if err == nil {
+			fields := log.Fields{"agent": addr, "container": container}
+			log.WithFields(fields).Info("Container restarted")
+		} else {
+			err = safeError(err)
+		}
+		return nil, err
+	})
+	return err
+}
+
 func RemoveContainer(addrs []string, container string, force bool) error {
 	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := RemoveContainerRequest{ID: container, Force: force}

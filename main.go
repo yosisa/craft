@@ -29,6 +29,7 @@ Usage:
   craft [-c FILE] ps [-a] [--full]
   craft [-c FILE] rm [-f] CONTAINER
   craft [-c FILE] pull IMAGE
+  craft [-c FILE] restart [-t TIMEOUT] CONTAINER
   craft [-c FILE] start CONTAINER
   craft [-c FILE] stop [-t TIMEOUT] CONTAINER
   craft -h | --help
@@ -156,6 +157,13 @@ func main() {
 			log.WithField("error", err).Fatal("Could not parse args")
 		}
 		err = rpc.StopContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
+		logRPCError(err)
+	case args["restart"]:
+		timeout, err := strconv.Atoi(args["--time"].(string))
+		if err != nil {
+			log.WithField("error", err).Fatal("Could not parse args")
+		}
+		err = rpc.RestartContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
 		logRPCError(err)
 	case args["pull"]:
 		err := rpc.PullImage(conf.Agents, args["IMAGE"].(string))

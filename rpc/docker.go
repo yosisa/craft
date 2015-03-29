@@ -47,6 +47,15 @@ func (d *Docker) StopContainer(req StopContainerRequest, resp *Empty) error {
 	return d.c.StopContainer(req.ID, req.Timeout)
 }
 
+type RestartContainerRequest struct {
+	ID      string
+	Timeout uint
+}
+
+func (d *Docker) RestartContainer(req RestartContainerRequest, resp *Empty) error {
+	return d.c.RestartContainer(req.ID, req.Timeout)
+}
+
 type RemoveContainerRequest struct {
 	ID    string
 	Force bool
