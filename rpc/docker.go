@@ -34,6 +34,18 @@ func (d *Docker) ListContainers(req ListContainersRequest, resp *ListContainersR
 	return nil
 }
 
+type RemoveContainerRequest struct {
+	ID    string
+	Force bool
+}
+
+func (d *Docker) RemoveContainer(req RemoveContainerRequest, resp *Empty) error {
+	return d.c.RemoveContainer(docker.RemoveContainerOptions{
+		ID:    req.ID,
+		Force: req.Force,
+	})
+}
+
 type PullImageRequest struct {
 	Image    string
 	StreamID uint32

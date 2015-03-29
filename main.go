@@ -27,6 +27,7 @@ Usage:
   craft [-c FILE] usage
   craft [-c FILE] submit MANIFEST
   craft [-c FILE] ps [-a] [--full]
+  craft [-c FILE] rm [-f] CONTAINER
   craft [-c FILE] pull IMAGE
   craft -h | --help
   craft --version
@@ -37,6 +38,7 @@ Options:
   -c FILE --config=FILE  Configuration file.
   -a --all               List all containers.
   --full                 Show full command.
+  -f                     Force remove.
 `
 
 func main() {
@@ -134,6 +136,8 @@ func main() {
 			}
 			fmt.Println()
 		}
+	case args["rm"]:
+		rpc.RemoveContainer(conf.Agents, args["CONTAINER"].(string), args["-f"].(bool))
 	case args["pull"]:
 		rpc.PullImage(conf.Agents, args["IMAGE"].(string))
 	}

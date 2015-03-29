@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"strings"
 
 	"github.com/yosisa/craft/mux"
 )
@@ -20,6 +21,18 @@ func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err erro
 	}
 	err = binary.Write(conn, binary.BigEndian, id)
 	return
+}
+
+func RemoveContainer(addrs []string, container string, force bool) error {
+	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		req := RemoveContainerRequest{ID: container, Force: force}
+		err := c.Call("Docker.RemoveContainer", req, &Empty{})
+		if err != nil && strings.HasPrefix(err.Error(), "No such container:") {
+			err = nil
+		}
+		return nil, err
+	})
+	return nil
 }
 
 func PullImage(addrs []string, image string) error {
