@@ -6,6 +6,7 @@ import (
 	"net/rpc"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/yosisa/craft/mux"
 )
 
@@ -24,7 +25,13 @@ func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err erro
 
 func StartContainer(addrs []string, container string) error {
 	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
-		err := safeError(c.Call("Docker.StartContainer", container, &Empty{}))
+		err := c.Call("Docker.StartContainer", container, &Empty{})
+		if err == nil {
+			fields := log.Fields{"agent": addr, "container": container}
+			log.WithFields(fields).Info("Container started")
+		} else {
+			err = safeError(err)
+		}
 		return nil, err
 	})
 	return err
@@ -33,7 +40,13 @@ func StartContainer(addrs []string, container string) error {
 func StopContainer(addrs []string, container string, timeout uint) error {
 	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := StopContainerRequest{ID: container, Timeout: timeout}
-		err := safeError(c.Call("Docker.StopContainer", req, &Empty{}))
+		err := c.Call("Docker.StopContainer", req, &Empty{})
+		if err == nil {
+			fields := log.Fields{"agent": addr, "container": container}
+			log.WithFields(fields).Info("Container stopped")
+		} else {
+			err = safeError(err)
+		}
 		return nil, err
 	})
 	return err
@@ -42,7 +55,13 @@ func StopContainer(addrs []string, container string, timeout uint) error {
 func RemoveContainer(addrs []string, container string, force bool) error {
 	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := RemoveContainerRequest{ID: container, Force: force}
-		err := safeError(c.Call("Docker.RemoveContainer", req, &Empty{}))
+		err := c.Call("Docker.RemoveContainer", req, &Empty{})
+		if err == nil {
+			fields := log.Fields{"agent": addr, "container": container}
+			log.WithFields(fields).Info("Container removed")
+		} else {
+			err = safeError(err)
+		}
 		return nil, err
 	})
 	return err
