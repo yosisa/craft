@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strings"
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/nsf/termbox-go"
 )
 
@@ -32,7 +32,7 @@ func (p *progressItem) start() {
 		var msg jsonMessage
 		if err := dec.Decode(&msg); err != nil {
 			if err != io.EOF {
-				log.Print(err)
+				log.WithField("error", err).Error("Failed to decode progress")
 			}
 			return
 		}

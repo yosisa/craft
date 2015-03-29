@@ -2,13 +2,13 @@ package rpc
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/rpc"
 	"strings"
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/yosisa/craft/config"
 	"github.com/yosisa/craft/docker"
 	"github.com/yosisa/craft/mux"
@@ -162,7 +162,7 @@ func ListenAndServe(c *config.Config) error {
 	}))
 	mux.Handle(chanNewStream, mux.HandlerFunc(func(c net.Conn) {
 		if err := streamConn.put(c); err != nil {
-			log.Print(err)
+			log.WithField("error", err).Error("Failed to put stream connection")
 			c.Close()
 		}
 	}))
@@ -179,7 +179,7 @@ func ListenAndServe(c *config.Config) error {
 		}
 		go func() {
 			if err := mux.Dispatch(conn); err != nil {
-				log.Print(err)
+				log.WithField("error", err).Error("Failed to dispatch connection")
 			}
 		}()
 	}
@@ -234,7 +234,7 @@ func CallAll(addrs []string, f func(c *rpc.Client, addr string) (interface{}, er
 			defer wg.Done()
 			c, err := Dial("tcp", addr)
 			if err != nil {
-				log.Print(err)
+				log.WithFields(log.Fields{"error": err, "agent": addr}).Error("Failed to connect agent")
 				return
 			}
 			defer c.Close()

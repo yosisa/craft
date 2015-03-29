@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	nrpc "net/rpc"
 	"regexp"
@@ -13,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docopt/docopt-go"
 	"github.com/dustin/go-humanize"
 	"github.com/yosisa/craft/config"
@@ -47,7 +47,7 @@ Options:
 func main() {
 	args, err := docopt.Parse(usage, nil, true, "craft 0.1.0", false)
 	if err != nil {
-		log.Fatal(err)
+		log.WithField("error", err).Fatal("Could not parse args")
 	}
 
 	var configPath string
@@ -56,45 +56,45 @@ func main() {
 	}
 	conf, err := config.Parse(configPath)
 	if err != nil {
-		log.Fatal(err)
+		log.WithField("error", err).Fatal("Could not parse config file")
 	}
 
 	switch {
 	case args["agent"]:
 		if err := rpc.ListenAndServe(conf); err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("Failed to listen")
 		}
 	case args["usage"]:
 		c, err := docker.NewClient(conf.Docker)
 		if err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("Failed to connect docker")
 		}
 		ui, err := c.Usage()
 		if err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("Failed to get usage")
 		}
 		fmt.Printf("%+v\n", ui)
 	case args["submit"]:
 		m, err := docker.ParseManifest(args["MANIFEST"].(string))
 		if err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("Could not parse manifest")
 		}
 
 		caps := gatherCapabilities(conf.Agents)
 		agent := findBestAgent(m, caps.Copy())
 		if agent == "" {
-			log.Fatal(errors.New("No available agents"))
+			log.WithField("error", "No available agents").Fatal("Could not find best agent")
 		}
 		exlinks, err := resolveExLinks(m, caps)
 		if err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("Failed to resolve exlinks")
 		}
 
 		resp, err := rpc.Submit(agent, m, exlinks)
 		if err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("RPC failed")
 		}
-		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
+		log.WithFields(log.Fields{"name": m.Name, "agent": resp.Agent}).Info("Container running")
 	case args["ps"]:
 		containers, err := rpc.CallAll(conf.Agents, func(c *nrpc.Client, addr string) (interface{}, error) {
 			req := rpc.ListContainersRequest{All: args["--all"].(bool)}
@@ -153,7 +153,7 @@ func main() {
 	case args["stop"]:
 		timeout, err := strconv.Atoi(args["--time"].(string))
 		if err != nil {
-			log.Fatal(err)
+			log.WithField("error", err).Fatal("Could not parse args")
 		}
 		err = rpc.StopContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
 		logRPCError(err)
@@ -190,18 +190,18 @@ func gatherCapabilities(agents []string) Capabilities {
 			defer wg.Done()
 			c, err := rpc.Dial("tcp", agent)
 			if err != nil {
-				log.Print(err)
+				log.WithFields(log.Fields{"error": err, "agent": agent}).Error("Failed to connect agent")
 				return
 			}
 			defer c.Close()
 
 			var cap rpc.Capability
 			if err = c.Call("Craft.Capability", rpc.Empty{}, &cap); err != nil {
-				log.Print(err)
+				log.WithFields(log.Fields{"error": err, "method": "Craft.Capability"}).Error("RPC failed")
 				return
 			}
 			if !cap.Available {
-				log.Printf("%s temporary unavailable", agent)
+				log.WithField("agent", agent).Info("Temporary unavailable")
 				return
 			}
 			caps[agent] = &cap
@@ -375,9 +375,10 @@ func logRPCError(err error) {
 	}
 	if re, ok := err.(rpc.Error); ok {
 		re.Each(func(addr string, err error) {
-			log.Printf("[%s] %s", addr, strings.TrimSpace(err.Error()))
+			fields := log.Fields{"error": strings.TrimSpace(err.Error()), "agent": addr}
+			log.WithFields(fields).Error("RPC error")
 		})
 	} else {
-		log.Print(err)
+		log.WithField("error", err).Error("RPC error")
 	}
 }
