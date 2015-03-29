@@ -30,16 +30,18 @@ Usage:
   craft [-c FILE] rm [-f] CONTAINER
   craft [-c FILE] pull IMAGE
   craft [-c FILE] start CONTAINER
+  craft [-c FILE] stop [-t TIMEOUT] CONTAINER
   craft -h | --help
   craft --version
 
 Options:
-  -h --help              Show this screen.
-  --version              Show version.
-  -c FILE --config=FILE  Configuration file.
-  -a --all               List all containers.
-  --full                 Show full command.
-  -f                     Force remove.
+  -h --help                  Show this screen.
+  --version                  Show version.
+  -c FILE --config=FILE      Configuration file.
+  -a --all                   List all containers.
+  --full                     Show full command.
+  -f                         Force remove.
+  -t TIMEOUT --time=TIMEOUT  Wait for the container to stop in seconds [default: 10].
 `
 
 func main() {
@@ -141,6 +143,12 @@ func main() {
 		rpc.RemoveContainer(conf.Agents, args["CONTAINER"].(string), args["-f"].(bool))
 	case args["start"]:
 		rpc.StartContainer(conf.Agents, args["CONTAINER"].(string))
+	case args["stop"]:
+		timeout, err := strconv.Atoi(args["--time"].(string))
+		if err != nil {
+			log.Fatal(err)
+		}
+		rpc.StopContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
 	case args["pull"]:
 		rpc.PullImage(conf.Agents, args["IMAGE"].(string))
 	}

@@ -34,6 +34,18 @@ func StartContainer(addrs []string, container string) error {
 	return nil
 }
 
+func StopContainer(addrs []string, container string, timeout uint) error {
+	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		req := StopContainerRequest{ID: container, Timeout: timeout}
+		err := c.Call("Docker.StopContainer", req, &Empty{})
+		if err != nil && strings.Contains(err.Error(), "No such container") {
+			err = nil
+		}
+		return nil, err
+	})
+	return nil
+}
+
 func RemoveContainer(addrs []string, container string, force bool) error {
 	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := RemoveContainerRequest{ID: container, Force: force}
