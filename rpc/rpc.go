@@ -177,7 +177,11 @@ func ListenAndServe(c *config.Config) error {
 			fmt.Println(err)
 			continue
 		}
-		go mux.HandleTCP(conn)
+		go func() {
+			if err := mux.Dispatch(conn); err != nil {
+				log.Print(err)
+			}
+		}()
 	}
 	return nil
 }
