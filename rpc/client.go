@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"encoding/binary"
-	"log"
 	"net"
 	"net/rpc"
 	"strings"
@@ -24,48 +23,47 @@ func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err erro
 }
 
 func StartContainer(addrs []string, container string) error {
-	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		err := safeError(c.Call("Docker.StartContainer", container, &Empty{}))
 		return nil, err
 	})
-	return nil
+	return err
 }
 
 func StopContainer(addrs []string, container string, timeout uint) error {
-	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := StopContainerRequest{ID: container, Timeout: timeout}
 		err := safeError(c.Call("Docker.StopContainer", req, &Empty{}))
 		return nil, err
 	})
-	return nil
+	return err
 }
 
 func RemoveContainer(addrs []string, container string, force bool) error {
-	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		req := RemoveContainerRequest{ID: container, Force: force}
 		err := safeError(c.Call("Docker.RemoveContainer", req, &Empty{}))
 		return nil, err
 	})
-	return nil
+	return err
 }
 
 func PullImage(addrs []string, image string) error {
 	p := newProgress()
 	go p.show()
-	CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		id, sc, err := AllocStream(c, addr)
-		if err == nil {
-			p.add(sc, addr)
-		} else {
-			log.Print(err)
+		if err != nil {
+			return nil, err
 		}
+		p.add(sc, addr)
 		req := PullImageRequest{Image: image, StreamID: id}
 		var resp Empty
 		err = c.Call("Docker.PullImage", req, &resp)
 		return nil, err
 	})
 	p.wait()
-	return nil
+	return err
 }
 
 func safeError(err error) error {

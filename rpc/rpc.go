@@ -220,10 +220,11 @@ func Submit(address string, m *docker.Manifest, exlinks []*ExLink) (*SubmitRespo
 	return &resp, err
 }
 
-func CallAll(addrs []string, f func(c *rpc.Client, addr string) (interface{}, error)) map[string]interface{} {
+func CallAll(addrs []string, f func(c *rpc.Client, addr string) (interface{}, error)) (map[string]interface{}, error) {
 	var wg sync.WaitGroup
 	wg.Add(len(addrs))
 	out := make(map[string]interface{})
+	errs := make(Error)
 	for _, addr := range addrs {
 		go func(addr string) {
 			defer wg.Done()
@@ -236,12 +237,31 @@ func CallAll(addrs []string, f func(c *rpc.Client, addr string) (interface{}, er
 
 			resp, err := f(c, addr)
 			if err != nil {
-				log.Print(err)
+				errs[addr] = err
 				return
 			}
 			out[addr] = resp
 		}(addr)
 	}
 	wg.Wait()
-	return out
+	if len(errs) == 0 {
+		return out, nil
+	}
+	return out, errs
+}
+
+type Error map[string]error
+
+func (e Error) Error() string {
+	var s []string
+	for addr, err := range e {
+		s = append(s, fmt.Sprintf("[%s] %s", addr, strings.TrimSpace(err.Error())))
+	}
+	return strings.Join(s, ", ")
+}
+
+func (e Error) Each(f func(string, error)) {
+	for addr, err := range e {
+		f(addr, err)
+	}
 }

@@ -96,12 +96,13 @@ func main() {
 		}
 		log.Printf("Container %s runs on %s", m.Name, resp.Agent)
 	case args["ps"]:
-		containers := rpc.CallAll(conf.Agents, func(c *nrpc.Client, addr string) (interface{}, error) {
+		containers, err := rpc.CallAll(conf.Agents, func(c *nrpc.Client, addr string) (interface{}, error) {
 			req := rpc.ListContainersRequest{All: args["--all"].(bool)}
 			var resp rpc.ListContainersResponse
 			err := c.Call("Docker.ListContainers", req, &resp)
 			return &resp, err
 		})
+		logRPCError(err)
 		for agent, resp := range containers {
 			fmt.Printf("[%s]\n", agent)
 			cons := resp.(*rpc.ListContainersResponse).Containers
@@ -144,17 +145,21 @@ func main() {
 			fmt.Println()
 		}
 	case args["rm"]:
-		rpc.RemoveContainer(conf.Agents, args["CONTAINER"].(string), args["-f"].(bool))
+		err := rpc.RemoveContainer(conf.Agents, args["CONTAINER"].(string), args["-f"].(bool))
+		logRPCError(err)
 	case args["start"]:
-		rpc.StartContainer(conf.Agents, args["CONTAINER"].(string))
+		err := rpc.StartContainer(conf.Agents, args["CONTAINER"].(string))
+		logRPCError(err)
 	case args["stop"]:
 		timeout, err := strconv.Atoi(args["--time"].(string))
 		if err != nil {
 			log.Fatal(err)
 		}
-		rpc.StopContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
+		err = rpc.StopContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
+		logRPCError(err)
 	case args["pull"]:
-		rpc.PullImage(conf.Agents, args["IMAGE"].(string))
+		err := rpc.PullImage(conf.Agents, args["IMAGE"].(string))
+		logRPCError(err)
 	}
 }
 
@@ -362,4 +367,17 @@ func (ps portSpecSlice) Contains(n int64) bool {
 		}
 	}
 	return false
+}
+
+func logRPCError(err error) {
+	if err == nil {
+		return
+	}
+	if re, ok := err.(rpc.Error); ok {
+		re.Each(func(addr string, err error) {
+			log.Printf("[%s] %s", addr, strings.TrimSpace(err.Error()))
+		})
+	} else {
+		log.Print(err)
+	}
 }
