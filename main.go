@@ -2,193 +2,40 @@ package main
 
 import (
 	"errors"
-	"fmt"
-	"io"
 	"math/rand"
-	nrpc "net/rpc"
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docopt/docopt-go"
-	"github.com/dustin/go-humanize"
+	"github.com/jessevdk/go-flags"
 	"github.com/yosisa/craft/config"
 	"github.com/yosisa/craft/docker"
 	"github.com/yosisa/craft/rpc"
 )
 
-var usage = `Docker provisioning tool
+type GlobalOptions struct {
+	Config string `short:"c" long:"config" description:"Configuration file"`
+}
 
-Usage:
-  craft [-c FILE] agent
-  craft [-c FILE] usage
-  craft [-c FILE] submit MANIFEST
-  craft [-c FILE] ps [-a] [--full]
-  craft [-c FILE] rm [-f] CONTAINER
-  craft [-c FILE] load [-i FILE]
-  craft [-c FILE] logs [--follow] [--tail=NUM] CONTAINER
-  craft [-c FILE] pull IMAGE
-  craft [-c FILE] restart [-t TIMEOUT] CONTAINER
-  craft [-c FILE] start CONTAINER
-  craft [-c FILE] stop [-t TIMEOUT] CONTAINER
-  craft -h | --help
-  craft --version
-
-Options:
-  -h --help                  Show this screen.
-  --version                  Show version.
-  -c FILE --config=FILE      Configuration file.
-  -a --all                   List all containers.
-  --full                     Show full command.
-  -f                         Force remove.
-  --follow                   Follow logs.
-  -i FILE --input=FILE       Input file [default: -].
-  --tail=NUM                 Number of recent logs [default: all].
-  -t TIMEOUT --time=TIMEOUT  Wait for the container to stop in seconds [default: 10].
-`
-
-func main() {
-	args, err := docopt.Parse(usage, nil, true, "craft 0.1.0", false)
-	if err != nil {
-		log.WithField("error", err).Fatal("Could not parse args")
-	}
-
-	var configPath string
-	if v, ok := args["--config"].(string); ok {
-		configPath = v
-	}
-	conf, err := config.Parse(configPath)
+func (opts *GlobalOptions) ParseConfig() *config.Config {
+	conf, err := config.Parse(opts.Config)
 	if err != nil {
 		log.WithField("error", err).Fatal("Could not parse config file")
 	}
+	return conf
+}
 
-	switch {
-	case args["agent"]:
-		if err := rpc.ListenAndServe(conf); err != nil {
-			log.WithField("error", err).Fatal("Failed to listen")
-		}
-	case args["usage"]:
-		c, err := docker.NewClient(conf.Docker)
-		if err != nil {
-			log.WithField("error", err).Fatal("Failed to connect docker")
-		}
-		ui, err := c.Usage()
-		if err != nil {
-			log.WithField("error", err).Fatal("Failed to get usage")
-		}
-		fmt.Printf("%+v\n", ui)
-	case args["submit"]:
-		m, err := docker.ParseManifest(args["MANIFEST"].(string))
-		if err != nil {
-			log.WithField("error", err).Fatal("Could not parse manifest")
-		}
+var (
+	gopts  GlobalOptions
+	parser = flags.NewParser(&gopts, flags.Default)
+)
 
-		caps := gatherCapabilities(conf.Agents)
-		agent := findBestAgent(m, caps.Copy())
-		if agent == "" {
-			log.WithField("error", "No available agents").Fatal("Could not find best agent")
-		}
-		exlinks, err := resolveExLinks(m, caps)
-		if err != nil {
-			log.WithField("error", err).Fatal("Failed to resolve exlinks")
-		}
-
-		resp, err := rpc.Submit(agent, m, exlinks)
-		if err != nil {
-			log.WithField("error", err).Fatal("RPC failed")
-		}
-		log.WithFields(log.Fields{"name": m.Name, "agent": resp.Agent}).Info("Container running")
-	case args["ps"]:
-		containers, err := rpc.CallAll(conf.Agents, func(c *nrpc.Client, addr string) (interface{}, error) {
-			req := rpc.ListContainersRequest{All: args["--all"].(bool)}
-			var resp rpc.ListContainersResponse
-			err := c.Call("Docker.ListContainers", req, &resp)
-			return &resp, err
-		})
-		logRPCError(err)
-		for agent, resp := range containers {
-			fmt.Printf("[%s]\n", agent)
-			cons := resp.(*rpc.ListContainersResponse).Containers
-			if len(cons) == 0 {
-				fmt.Println()
-				continue
-			}
-			var nn, ni, nc, nt, ns int
-			for _, c := range cons {
-				if n := len(docker.CanonicalName(c.Names)); n > nn {
-					nn = n
-				}
-				if n := len(c.Image); n > ni {
-					ni = n
-				}
-				if n := len(c.Command); n > nc {
-					nc = n
-				}
-				if n := len(humanize.Time(time.Unix(c.Created, 0))); n > nt {
-					nt = n
-				}
-				if n := len(c.Status); n > ns {
-					ns = n
-				}
-			}
-			if nc > 20 && !args["--full"].(bool) {
-				nc = 20
-			}
-			s := "  %-15s%-" + strconv.Itoa(nn+3) + "s%-" + strconv.Itoa(ni+3) + "s%-" +
-				strconv.Itoa(nc+3) + "s%-" + strconv.Itoa(nt+3) + "s%-" + strconv.Itoa(ns+3) + "s%s\n"
-			fmt.Printf(s, "CONTAINER ID", "NAME", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS")
-			for _, c := range cons {
-				cmd := c.Command
-				if len(cmd) > 20 && !args["--full"].(bool) {
-					cmd = cmd[:20]
-				}
-				fmt.Printf(s, c.ID[:12], docker.CanonicalName(c.Names), c.Image, cmd,
-					humanize.Time(time.Unix(c.Created, 0)), c.Status, docker.FormatPorts(c.Ports))
-			}
-			fmt.Println()
-		}
-	case args["rm"]:
-		err := rpc.RemoveContainer(conf.Agents, args["CONTAINER"].(string), args["-f"].(bool))
-		logRPCError(err)
-	case args["start"]:
-		err := rpc.StartContainer(conf.Agents, args["CONTAINER"].(string))
-		logRPCError(err)
-	case args["stop"]:
-		timeout, err := strconv.Atoi(args["--time"].(string))
-		if err != nil {
-			log.WithField("error", err).Fatal("Could not parse args")
-		}
-		err = rpc.StopContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
-		logRPCError(err)
-	case args["restart"]:
-		timeout, err := strconv.Atoi(args["--time"].(string))
-		if err != nil {
-			log.WithField("error", err).Fatal("Could not parse args")
-		}
-		err = rpc.RestartContainer(conf.Agents, args["CONTAINER"].(string), uint(timeout))
-		logRPCError(err)
-	case args["pull"]:
-		err := rpc.PullImage(conf.Agents, args["IMAGE"].(string))
-		logRPCError(err)
-	case args["logs"]:
-		err := rpc.Logs(conf.Agents, args["CONTAINER"].(string), args["--follow"].(bool), args["--tail"].(string))
-		logRPCError(err)
-	case args["load"]:
-		var r io.Reader
-		if path := args["--input"].(string); path == "-" {
-			r = os.Stdin
-		} else {
-			if r, err = os.Open(path); err != nil {
-				log.WithField("error", err).Fatal("Could not open input file")
-			}
-		}
-		err := rpc.LoadImage(conf.Agents, r)
-		logRPCError(err)
+func main() {
+	if _, err := parser.Parse(); err != nil {
+		os.Exit(1)
 	}
 }
 

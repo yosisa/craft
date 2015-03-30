@@ -31,6 +31,15 @@ func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err erro
 	return
 }
 
+func ListContainers(addrs []string, all bool) (map[string]interface{}, error) {
+	return CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		req := ListContainersRequest{All: all}
+		var resp ListContainersResponse
+		err := c.Call("Docker.ListContainers", req, &resp)
+		return &resp, err
+	})
+}
+
 func StartContainer(addrs []string, container string) error {
 	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
 		err := c.Call("Docker.StartContainer", container, &Empty{})
