@@ -8,7 +8,8 @@ import (
 )
 
 type CmdLoad struct {
-	Input string `short:"i" long:"input" description:"Input file" default:"-"`
+	Input    string `short:"i" long:"input" description:"Input file" default:"-"`
+	Pipeline bool   `long:"pipeline" description:"Send an image using pipeline"`
 }
 
 func (opts *CmdLoad) Execute(args []string) (err error) {
@@ -21,7 +22,7 @@ func (opts *CmdLoad) Execute(args []string) (err error) {
 			return
 		}
 	}
-	logRPCError(rpc.LoadImage(conf.Agents, r))
+	logRPCError(rpc.LoadImage(conf.Agents, r, opts.Pipeline))
 	return
 }
 

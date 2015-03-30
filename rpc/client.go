@@ -166,7 +166,11 @@ func Logs(addrs []string, container string, follow bool, tail string) error {
 	return err
 }
 
-func LoadImage(addrs []string, r io.Reader) error {
+func LoadImage(addrs []string, r io.Reader, pipeline bool) error {
+	if pipeline {
+		return LoadImageUsingPipeline(addrs, r)
+	}
+
 	n := int32(len(addrs))
 	queue := make(chan net.Conn, len(addrs))
 	ready := func() {
@@ -192,10 +196,31 @@ func LoadImage(addrs []string, r io.Reader) error {
 		}
 		queue <- sc
 		ready()
-		err = c.Call("Docker.LoadImage", id, &Empty{})
+		req := LoadImageRequest{StreamID: id}
+		err = c.Call("Docker.LoadImage", req, &Empty{})
 		return nil, err
 	})
 	return err
+}
+
+func LoadImageUsingPipeline(addrs []string, r io.Reader) error {
+	next, rest := addrs[0], addrs[1:]
+	c, err := Dial("tcp", next)
+	if err != nil {
+		return err
+	}
+	id, sc, err := AllocStream(c, next)
+	if err != nil {
+		return err
+	}
+
+	log.WithField("next", next).Info("Sending the image using pipeline")
+	go func() {
+		io.Copy(sc, r)
+		sc.Close()
+	}()
+	req := LoadImageRequest{StreamID: id, Rest: rest}
+	return c.Call("Docker.LoadImage", req, &Empty{})
 }
 
 type logWriter struct {

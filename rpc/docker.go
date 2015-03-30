@@ -1,6 +1,8 @@
 package rpc
 
 import (
+	"io"
+
 	"github.com/fsouza/go-dockerclient"
 	cdocker "github.com/yosisa/craft/docker"
 )
@@ -120,10 +122,38 @@ func (d *Docker) Logs(req LogsRequest, resp *Empty) error {
 	})
 }
 
-func (d *Docker) LoadImage(req uint32, resp *Empty) error {
-	c, err := streamConn.get(req)
+type LoadImageRequest struct {
+	StreamID uint32
+	Rest     []string
+}
+
+func (d *Docker) LoadImage(req LoadImageRequest, resp *Empty) error {
+	c, err := streamConn.get(req.StreamID)
 	if err != nil {
 		return err
 	}
-	return d.c.LoadImage(docker.LoadImageOptions{InputStream: c})
+	if len(req.Rest) == 0 {
+		return d.c.LoadImage(docker.LoadImageOptions{InputStream: c})
+	}
+
+	// pipelining and is intermediate node
+	errc := make(chan error, 2)
+	pr, pw := io.Pipe()
+	r := io.TeeReader(c, pw)
+	go func() {
+		errc <- LoadImageUsingPipeline(req.Rest, pr)
+	}()
+	go func() {
+		errc <- d.c.LoadImage(docker.LoadImageOptions{InputStream: r})
+		pw.Close()
+	}()
+
+	for i := 0; i < 2; i++ {
+		if err == nil {
+			err = <-errc
+		} else {
+			<-errc
+		}
+	}
+	return err
 }
