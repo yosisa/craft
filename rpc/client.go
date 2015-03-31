@@ -16,6 +16,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/yosisa/craft/mux"
+	"github.com/yosisa/throttle"
 )
 
 func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err error) {
@@ -166,8 +167,11 @@ func Logs(addrs []string, container string, follow bool, tail string) error {
 	return err
 }
 
-func LoadImage(addrs []string, r io.Reader, pipeline bool) error {
+func LoadImage(addrs []string, r io.Reader, pipeline bool, bwlimit uint64) error {
 	if pipeline {
+		if bwlimit > 0 {
+			r = throttle.NewReader(r, int64(bwlimit), int64(bwlimit))
+		}
 		return LoadImageUsingPipeline(addrs, r)
 	}
 
@@ -184,7 +188,14 @@ func LoadImage(addrs []string, r io.Reader, pipeline bool) error {
 			ws = append(ws, c)
 			defer c.Close()
 		}
+		if len(ws) == 0 {
+			return
+		}
 		w := io.MultiWriter(ws...)
+		if bwlimit > 0 {
+			n := int64(bwlimit / uint64(len(ws)))
+			w = throttle.NewWriter(w, n, n)
+		}
 		io.Copy(w, r)
 	}()
 
