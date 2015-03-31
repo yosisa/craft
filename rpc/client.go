@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pierrec/lz4"
 	"github.com/yosisa/craft/mux"
 	"github.com/yosisa/throttle"
 )
@@ -167,14 +168,7 @@ func Logs(addrs []string, container string, follow bool, tail string) error {
 	return err
 }
 
-func LoadImage(addrs []string, r io.Reader, pipeline bool, bwlimit uint64) error {
-	if pipeline {
-		if bwlimit > 0 {
-			r = throttle.NewReader(r, int64(bwlimit), int64(bwlimit))
-		}
-		return LoadImageUsingPipeline(addrs, r)
-	}
-
+func LoadImage(addrs []string, r io.Reader, compress bool, bwlimit uint64) error {
 	n := int32(len(addrs))
 	queue := make(chan net.Conn, len(addrs))
 	ready := func() {
@@ -196,6 +190,10 @@ func LoadImage(addrs []string, r io.Reader, pipeline bool, bwlimit uint64) error
 			n := int64(bwlimit / uint64(len(ws)))
 			w = throttle.NewWriter(w, n, n)
 		}
+		if compress {
+			w = lz4.NewWriter(w)
+			defer w.(*lz4.Writer).Close()
+		}
 		io.Copy(w, r)
 	}()
 
@@ -207,14 +205,22 @@ func LoadImage(addrs []string, r io.Reader, pipeline bool, bwlimit uint64) error
 		}
 		queue <- sc
 		ready()
-		req := LoadImageRequest{StreamID: id}
+		req := LoadImageRequest{StreamID: id, Compress: compress}
 		err = c.Call("Docker.LoadImage", req, &Empty{})
 		return nil, err
 	})
 	return err
 }
 
-func LoadImageUsingPipeline(addrs []string, r io.Reader) error {
+func LoadImageUsingPipeline(addrs []string, r io.Reader, compress bool, bwlimit uint64) error {
+	return loadImageUsingPipeline(addrs, r, compress, false, bwlimit)
+}
+
+func connectImagePipeline(addrs []string, r io.Reader, compressed bool) error {
+	return loadImageUsingPipeline(addrs, r, false, compressed, 0)
+}
+
+func loadImageUsingPipeline(addrs []string, r io.Reader, compress, compressed bool, bwlimit uint64) error {
 	next, rest := addrs[0], addrs[1:]
 	c, err := Dial("tcp", next)
 	if err != nil {
@@ -226,11 +232,18 @@ func LoadImageUsingPipeline(addrs []string, r io.Reader) error {
 	}
 
 	log.WithField("next", next).Info("Sending the image using pipeline")
-	go func() {
-		io.Copy(sc, r)
-		sc.Close()
-	}()
-	req := LoadImageRequest{StreamID: id, Rest: rest}
+	go func(w io.Writer) {
+		defer sc.Close()
+		if bwlimit > 0 {
+			w = throttle.NewWriter(w, int64(bwlimit), int64(bwlimit))
+		}
+		if compress {
+			w = lz4.NewWriter(w)
+			defer w.(*lz4.Writer).Close()
+		}
+		io.Copy(w, r)
+	}(sc)
+	req := LoadImageRequest{StreamID: id, Compress: compress || compressed, Rest: rest}
 	return c.Call("Docker.LoadImage", req, &Empty{})
 }
 

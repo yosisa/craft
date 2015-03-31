@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/fsouza/go-dockerclient"
+	"github.com/pierrec/lz4"
 	cdocker "github.com/yosisa/craft/docker"
 )
 
@@ -124,6 +125,7 @@ func (d *Docker) Logs(req LogsRequest, resp *Empty) error {
 
 type LoadImageRequest struct {
 	StreamID uint32
+	Compress bool
 	Rest     []string
 }
 
@@ -132,16 +134,23 @@ func (d *Docker) LoadImage(req LoadImageRequest, resp *Empty) error {
 	if err != nil {
 		return err
 	}
+	var r io.Reader = c
 	if len(req.Rest) == 0 {
-		return d.c.LoadImage(docker.LoadImageOptions{InputStream: c})
+		if req.Compress {
+			r = lz4.NewReader(r)
+		}
+		return d.c.LoadImage(docker.LoadImageOptions{InputStream: r})
 	}
 
 	// pipelining and is intermediate node
 	errc := make(chan error, 2)
 	pr, pw := io.Pipe()
-	r := io.TeeReader(c, pw)
+	r = io.TeeReader(r, pw)
+	if req.Compress {
+		r = lz4.NewReader(r)
+	}
 	go func() {
-		errc <- LoadImageUsingPipeline(req.Rest, pr)
+		errc <- connectImagePipeline(req.Rest, pr, req.Compress)
 	}()
 	go func() {
 		errc <- d.c.LoadImage(docker.LoadImageOptions{InputStream: r})

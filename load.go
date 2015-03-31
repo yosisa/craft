@@ -22,6 +22,7 @@ func (n *ByteSize) UnmarshalFlag(value string) error {
 type CmdLoad struct {
 	Input    string   `short:"i" long:"input" description:"Input file" default:"-"`
 	Pipeline bool     `long:"pipeline" description:"Send an image using pipeline"`
+	Compress bool     `long:"compress" description:"Compress stream using LZ4"`
 	BWLimit  ByteSize `long:"bwlimit" description:"Limit bandwidth"`
 }
 
@@ -35,7 +36,11 @@ func (opts *CmdLoad) Execute(args []string) (err error) {
 			return
 		}
 	}
-	logRPCError(rpc.LoadImage(conf.Agents, r, opts.Pipeline, uint64(opts.BWLimit)))
+	if opts.Pipeline {
+		logRPCError(rpc.LoadImageUsingPipeline(conf.Agents, r, opts.Compress, uint64(opts.BWLimit)))
+	} else {
+		logRPCError(rpc.LoadImage(conf.Agents, r, opts.Compress, uint64(opts.BWLimit)))
+	}
 	return
 }
 
