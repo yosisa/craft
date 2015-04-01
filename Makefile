@@ -1,9 +1,8 @@
-SOURCES := $(shell find . -name '*.go')
 BIN := craft
 
 all: deps $(BIN)
 
-$(BIN): filter/parser.peg.go $(SOURCES)
+$(BIN): filter/parser.peg.go
 	go build
 
 deps:
@@ -21,4 +20,4 @@ clean:
 
 .SUFFIXES: .peg .peg.go
 
-.PHONY: all deps test clean
+.PHONY: all deps test clean $(BIN)
