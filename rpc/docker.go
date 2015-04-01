@@ -123,6 +123,15 @@ func (d *Docker) Logs(req LogsRequest, resp *Empty) error {
 	})
 }
 
+type ListImagesResponse struct {
+	Images []docker.APIImages
+}
+
+func (d *Docker) ListImages(req Empty, resp *ListImagesResponse) (err error) {
+	resp.Images, err = d.c.ListImages(docker.ListImagesOptions{})
+	return
+}
+
 type LoadImageRequest struct {
 	StreamID uint32
 	Compress bool

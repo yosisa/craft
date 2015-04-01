@@ -168,6 +168,14 @@ func Logs(addrs []string, container string, follow bool, tail string) error {
 	return err
 }
 
+func ListImages(addrs []string) (map[string]interface{}, error) {
+	return CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		var resp ListImagesResponse
+		err := c.Call("Docker.ListImages", Empty{}, &resp)
+		return &resp, err
+	})
+}
+
 func LoadImage(addrs []string, r io.Reader, compress bool, bwlimit uint64) error {
 	n := int32(len(addrs))
 	queue := make(chan net.Conn, len(addrs))
