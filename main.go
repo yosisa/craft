@@ -20,7 +20,8 @@ import (
 
 type GlobalOptions struct {
 	Config string `short:"c" long:"config" description:"Configuration file"`
-	Filter string `short:"F" long:"filter" description:"Filter target agents"`
+	Agents string `long:"agents" description:"Comma separated agent list" env:"CRAFT_AGENTS"`
+	Filter string `short:"F" long:"filter" description:"Filter target agents" env:"CRAFT_FILTER"`
 	conf   *config.Config
 }
 
@@ -28,6 +29,9 @@ func (opts *GlobalOptions) ParseConfig() *config.Config {
 	var err error
 	if opts.conf, err = config.Parse(opts.Config); err != nil {
 		log.WithField("error", err).Fatal("Could not parse config file")
+	}
+	if opts.Agents != "" {
+		opts.conf.Agents = strings.Split(opts.Agents, ",")
 	}
 	return opts.conf
 }
