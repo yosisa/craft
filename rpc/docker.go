@@ -175,3 +175,7 @@ func (d *Docker) LoadImage(req LoadImageRequest, resp *Empty) error {
 	}
 	return err
 }
+
+func (d *Docker) RemoveImage(req string, resp *Empty) error {
+	return d.c.RemoveImage(req)
+}

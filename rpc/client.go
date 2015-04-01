@@ -255,6 +255,18 @@ func loadImageUsingPipeline(addrs []string, r io.Reader, compress, compressed bo
 	return c.Call("Docker.LoadImage", req, &Empty{})
 }
 
+func RemoveImage(addrs []string, name string) error {
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		err := c.Call("Docker.RemoveImage", name, &Empty{})
+		if err == nil {
+			fields := log.Fields{"agent": addr, "image": name}
+			log.WithFields(fields).Info("Image removed")
+		}
+		return nil, safeError(err)
+	})
+	return err
+}
+
 type logWriter struct {
 	c  chan string
 	wg sync.WaitGroup
@@ -306,7 +318,12 @@ func (l *logWriter) close() {
 }
 
 func safeError(err error) error {
-	if err != nil && strings.Contains(err.Error(), "No such container") {
+	switch {
+	case err == nil:
+		return nil
+	case strings.Contains(err.Error(), "No such container"):
+		return nil
+	case strings.Contains(err.Error(), "no such image"):
 		return nil
 	}
 	return err
