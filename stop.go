@@ -10,8 +10,7 @@ type CmdStop struct {
 }
 
 func (opts *CmdStop) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	logRPCError(rpc.StopContainer(conf.Agents, opts.Args.Container, opts.Timeout))
+	logRPCError(rpc.StopContainer(gopts.agents(), opts.Args.Container, opts.Timeout))
 	return nil
 }
 

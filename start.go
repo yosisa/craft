@@ -9,8 +9,7 @@ type CmdStart struct {
 }
 
 func (opts *CmdStart) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	logRPCError(rpc.StartContainer(conf.Agents, opts.Args.Container))
+	logRPCError(rpc.StartContainer(gopts.agents(), opts.Args.Container))
 	return nil
 }
 

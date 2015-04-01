@@ -14,19 +14,52 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/yosisa/craft/config"
 	"github.com/yosisa/craft/docker"
+	"github.com/yosisa/craft/filter"
 	"github.com/yosisa/craft/rpc"
 )
 
 type GlobalOptions struct {
 	Config string `short:"c" long:"config" description:"Configuration file"`
+	Filter string `short:"F" long:"filter" description:"Filter target agents"`
+	conf   *config.Config
 }
 
 func (opts *GlobalOptions) ParseConfig() *config.Config {
-	conf, err := config.Parse(opts.Config)
-	if err != nil {
+	var err error
+	if opts.conf, err = config.Parse(opts.Config); err != nil {
 		log.WithField("error", err).Fatal("Could not parse config file")
 	}
-	return conf
+	return opts.conf
+}
+
+func (opts *GlobalOptions) agents() []string {
+	if opts.conf == nil {
+		opts.ParseConfig()
+	}
+	v, err := filterAgents(opts.conf.Agents, opts.Filter)
+	if err != nil {
+		log.WithField("error", err).Fatal("Failed to filter target agents")
+	}
+	return v
+}
+
+func filterAgents(agents []string, s string) ([]string, error) {
+	if s == "" {
+		return agents, nil
+	}
+	expr, err := filter.Parse(s)
+	if err != nil {
+		return nil, err
+	}
+	caps := gatherCapabilities(agents)
+	caps.Filter(func(cap *rpc.Capability) bool {
+		return expr.Eval(cap)
+	})
+	var out []string
+	for agent := range caps {
+		out = append(out, agent)
+	}
+	return out, nil
 }
 
 var (

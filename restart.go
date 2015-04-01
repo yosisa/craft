@@ -10,8 +10,7 @@ type CmdRestart struct {
 }
 
 func (opts *CmdRestart) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	logRPCError(rpc.RestartContainer(conf.Agents, opts.Args.Container, opts.Timeout))
+	logRPCError(rpc.RestartContainer(gopts.agents(), opts.Args.Container, opts.Timeout))
 	return nil
 }
 

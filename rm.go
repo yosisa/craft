@@ -10,8 +10,7 @@ type CmdRm struct {
 }
 
 func (opts *CmdRm) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	logRPCError(rpc.RemoveContainer(conf.Agents, opts.Args.Container, opts.Force))
+	logRPCError(rpc.RemoveContainer(gopts.agents(), opts.Args.Container, opts.Force))
 	return nil
 }
 

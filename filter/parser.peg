@@ -1,0 +1,23 @@
+package filter
+
+type parser Peg {
+        stack []Evaluator
+        err   error
+}
+
+FILTER  <- Expr !.
+Expr    <- factor orExpr*
+orExpr  <- wsp "or" wsp factor { p.Or() }
+factor  <- primary andExpr*
+andExpr <- wsp "and" wsp primary { p.And() }
+primary <- '(' ws Expr ws ')'
+         / "not" wsp primary { p.Not() }
+         / agent
+
+agent   <- "A@" <regexp> { p.Agent(buffer[begin:end]) }
+regexp  <- char* '(' regexp ')' char*
+         / char* '|' regexp*
+         / char+
+char    <- ![ ()] .
+ws      <- ' '*
+wsp     <- ' '+

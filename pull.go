@@ -9,8 +9,7 @@ type CmdPull struct {
 }
 
 func (opts *CmdPull) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	logRPCError(rpc.PullImage(conf.Agents, opts.Args.Image))
+	logRPCError(rpc.PullImage(gopts.agents(), opts.Args.Image))
 	return nil
 }
 

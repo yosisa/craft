@@ -27,7 +27,6 @@ type CmdLoad struct {
 }
 
 func (opts *CmdLoad) Execute(args []string) (err error) {
-	conf := gopts.ParseConfig()
 	var r io.Reader
 	if path := opts.Input; path == "-" {
 		r = os.Stdin
@@ -37,9 +36,9 @@ func (opts *CmdLoad) Execute(args []string) (err error) {
 		}
 	}
 	if opts.Pipeline {
-		logRPCError(rpc.LoadImageUsingPipeline(conf.Agents, r, opts.Compress, uint64(opts.BWLimit)))
+		logRPCError(rpc.LoadImageUsingPipeline(gopts.agents(), r, opts.Compress, uint64(opts.BWLimit)))
 	} else {
-		logRPCError(rpc.LoadImage(conf.Agents, r, opts.Compress, uint64(opts.BWLimit)))
+		logRPCError(rpc.LoadImage(gopts.agents(), r, opts.Compress, uint64(opts.BWLimit)))
 	}
 	return
 }

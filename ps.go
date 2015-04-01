@@ -16,8 +16,7 @@ type CmdPs struct {
 }
 
 func (opts *CmdPs) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	containers, err := rpc.ListContainers(conf.Agents, opts.All)
+	containers, err := rpc.ListContainers(gopts.agents(), opts.All)
 	logRPCError(err)
 	for agent, resp := range containers {
 		fmt.Printf("[%s]\n", agent)

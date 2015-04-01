@@ -11,8 +11,7 @@ type CmdLogs struct {
 }
 
 func (opts *CmdLogs) Execute(args []string) error {
-	conf := gopts.ParseConfig()
-	logRPCError(rpc.Logs(conf.Agents, opts.Args.Container, opts.Follow, opts.Tail))
+	logRPCError(rpc.Logs(gopts.agents(), opts.Args.Container, opts.Follow, opts.Tail))
 	return nil
 }
 

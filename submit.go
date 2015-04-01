@@ -13,13 +13,12 @@ type CmdSubmit struct {
 }
 
 func (opts *CmdSubmit) Execute(args []string) error {
-	conf := gopts.ParseConfig()
 	m, err := docker.ParseManifest(opts.Args.Manifest)
 	if err != nil {
 		log.WithField("error", err).Fatal("Could not parse manifest")
 	}
 
-	caps := gatherCapabilities(conf.Agents)
+	caps := gatherCapabilities(gopts.agents())
 	agent := findBestAgent(m, caps.Copy())
 	if agent == "" {
 		log.WithField("error", "No available agents").Fatal("Could not find best agent")
