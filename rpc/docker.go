@@ -2,7 +2,9 @@ package rpc
 
 import (
 	"io"
+	"net"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/pierrec/lz4"
 	cdocker "github.com/yosisa/craft/docker"
@@ -178,4 +180,67 @@ func (d *Docker) LoadImage(req LoadImageRequest, resp *Empty) error {
 
 func (d *Docker) RemoveImage(req string, resp *Empty) error {
 	return d.c.RemoveImage(req)
+}
+
+type ExecRequest struct {
+	Container   string
+	Cmd         []string
+	Interactive bool
+	TTY         bool
+	TTYWidth    int
+	TTYHeight   int
+	InStreamID  uint32
+	OutStreamID uint32
+	ErrStreamID uint32
+}
+
+func (d *Docker) Exec(req ExecRequest, resp *Empty) (err error) {
+	var stdin, stdout, stderr net.Conn
+	if stdout, err = streamConn.get(req.OutStreamID); err != nil {
+		return
+	}
+	defer stdout.Close()
+	if stderr, err = streamConn.get(req.ErrStreamID); err != nil {
+		return
+	}
+	defer stderr.Close()
+
+	if req.Interactive {
+		if stdin, err = streamConn.get(req.InStreamID); err != nil {
+			return
+		}
+		defer stdin.Close()
+	}
+
+	exec, err := d.c.CreateExec(docker.CreateExecOptions{
+		Container:    req.Container,
+		Cmd:          req.Cmd,
+		Tty:          req.TTY,
+		AttachStdin:  req.Interactive,
+		AttachStdout: true,
+		AttachStderr: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	opts := docker.StartExecOptions{
+		Tty:          req.TTY,
+		Detach:       false,
+		InputStream:  stdin,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		RawTerminal:  req.TTY,
+	}
+	if req.TTY {
+		opts.Success = make(chan struct{})
+		go func() {
+			<-opts.Success
+			if err = d.c.ResizeExecTTY(exec.ID, req.TTYHeight, req.TTYWidth); err != nil {
+				log.WithField("error", err).Warning("Failed to resize tty")
+			}
+			close(opts.Success)
+		}()
+	}
+	return d.c.StartExec(exec.ID, opts)
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/pierrec/lz4"
 	"github.com/yosisa/craft/mux"
 	"github.com/yosisa/throttle"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func AllocStream(c *rpc.Client, addr string) (id uint32, conn net.Conn, err error) {
@@ -261,6 +262,67 @@ func RemoveImage(addrs []string, name string) error {
 		if err == nil {
 			fields := log.Fields{"agent": addr, "image": name}
 			log.WithFields(fields).Info("Image removed")
+		}
+		return nil, safeError(err)
+	})
+	return err
+}
+
+func Exec(addrs []string, container string, cmd []string, interactive, tty bool) error {
+	var w, h int
+	if tty {
+		var err error
+		if w, h, err = terminal.GetSize(0); err != nil {
+			return err
+		}
+	}
+	_, err := CallAll(addrs, func(c *rpc.Client, addr string) (interface{}, error) {
+		outid, outc, err := AllocStream(c, addr)
+		if err != nil {
+			return nil, err
+		}
+		defer outc.Close()
+		go io.Copy(os.Stdout, outc)
+
+		errid, errc, err := AllocStream(c, addr)
+		if err != nil {
+			return nil, err
+		}
+		defer errc.Close()
+		go io.Copy(os.Stderr, errc)
+
+		req := &ExecRequest{
+			Container:   container,
+			Cmd:         cmd,
+			Interactive: interactive,
+			TTY:         tty,
+			TTYWidth:    w,
+			TTYHeight:   h,
+			OutStreamID: outid,
+			ErrStreamID: errid,
+		}
+
+		fields := log.Fields{"agent": addr, "container": container, "command": strings.Join(cmd, " ")}
+		if interactive {
+			inid, inc, err := AllocStream(c, addr)
+			if err != nil {
+				return nil, err
+			}
+			defer inc.Close()
+
+			if tty {
+				oldState, err := terminal.MakeRaw(0)
+				if err != nil {
+					return nil, err
+				}
+				defer terminal.Restore(0, oldState)
+			}
+			go io.Copy(inc, os.Stdin)
+			req.InStreamID = inid
+			log.WithFields(fields).Info("Exec interactive command")
+		}
+		if err = c.Call("Docker.Exec", req, &Empty{}); err == nil {
+			log.WithFields(fields).Info("Command executed")
 		}
 		return nil, safeError(err)
 	})

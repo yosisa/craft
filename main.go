@@ -68,7 +68,7 @@ func filterAgents(agents []string, s string) ([]string, error) {
 
 var (
 	gopts  GlobalOptions
-	parser = flags.NewParser(&gopts, flags.Default)
+	parser = flags.NewParser(&gopts, flags.Default|flags.IgnoreUnknown)
 )
 
 func main() {
@@ -96,6 +96,14 @@ func (c Capabilities) Copy() Capabilities {
 		caps[agent] = cap
 	}
 	return caps
+}
+
+func (c Capabilities) Agents() []string {
+	out := make([]string, 0, len(c))
+	for agent := range c {
+		out = append(out, agent)
+	}
+	return out
 }
 
 func gatherCapabilities(agents []string) Capabilities {
