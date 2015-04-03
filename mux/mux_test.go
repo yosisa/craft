@@ -37,7 +37,7 @@ func (s *MuxSuite) TestServer(c *C) {
 			if err != nil {
 				return
 			}
-			go m.HandleTCP(conn)
+			go m.Dispatch(conn)
 		}
 	}()
 
