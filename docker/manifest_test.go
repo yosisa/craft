@@ -89,20 +89,20 @@ var _ = Suite(&VolumeSpecSuite{})
 
 func (s *VolumeSpecSuite) TestUnmarshal(c *C) {
 	text := `["/var/tmp", "/data -> /opt"]`
-	var volumes []VolumeSpec
-	err := json.Unmarshal([]byte(text), &volumes)
+	var mounts []MountSpec
+	err := json.Unmarshal([]byte(text), &mounts)
 	c.Assert(err, IsNil)
-	c.Assert(volumes, HasLen, 2)
+	c.Assert(mounts, HasLen, 2)
 
-	c.Assert(volumes[0].Path, Equals, "/var/tmp")
-	c.Assert(volumes[0].Target, Equals, "/var/tmp")
+	c.Assert(mounts[0].Path, Equals, "/var/tmp")
+	c.Assert(mounts[0].Target, Equals, "/var/tmp")
 
-	c.Assert(volumes[1].Path, Equals, "/data")
-	c.Assert(volumes[1].Target, Equals, "/opt")
+	c.Assert(mounts[1].Path, Equals, "/data")
+	c.Assert(mounts[1].Target, Equals, "/opt")
 }
 
 func (s *VolumeSpecSuite) TestString(c *C) {
-	vs := VolumeSpec{Path: "/data", Target: "/opt"}
+	vs := MountSpec{Path: "/data", Target: "/opt"}
 	c.Assert(vs.String(), Equals, "/data:/opt")
 }
 

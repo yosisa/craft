@@ -21,7 +21,7 @@ type Manifest struct {
 	Image       string
 	ImageHash   string `json:"image_hash"`
 	Ports       []PortSpec
-	Volumes     []VolumeSpec
+	Mounts      []MountSpec
 	Links       []Link
 	ExLinks     []Link
 	Env         Env
@@ -74,7 +74,7 @@ func (m *Manifest) PortBindings() map[docker.Port][]docker.PortBinding {
 
 func (m *Manifest) Binds() []string {
 	var s []string
-	for _, v := range m.Volumes {
+	for _, v := range m.Mounts {
 		s = append(s, v.String())
 	}
 	return s
@@ -121,12 +121,12 @@ func (s *PortSpec) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-type VolumeSpec struct {
+type MountSpec struct {
 	Path   string
 	Target string
 }
 
-func (s *VolumeSpec) UnmarshalJSON(b []byte) error {
+func (s *MountSpec) UnmarshalJSON(b []byte) error {
 	b = bytes.Trim(b, `"`)
 	items := bytes.Split(b, []byte("->"))
 	s.Path = string(bytes.TrimSpace(items[0]))
@@ -138,7 +138,7 @@ func (s *VolumeSpec) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (s *VolumeSpec) String() string {
+func (s *MountSpec) String() string {
 	return s.Path + ":" + s.Target
 }
 
