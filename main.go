@@ -177,6 +177,15 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 		return true
 	})
 
+	// Check existence of volume containers
+	if len(m.VolumesFrom) > 0 {
+		for _, volume := range m.VolumesFrom {
+			caps.Filter(func(cap *rpc.Capability) bool {
+				return stringSlice(cap.AllNames).Contains(volume)
+			})
+		}
+	}
+
 	// Check existence of a network container
 	if strings.HasPrefix(m.NetworkMode, "container:") {
 		name := m.NetworkMode[10:]

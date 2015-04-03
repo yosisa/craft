@@ -22,6 +22,8 @@ type Manifest struct {
 	ImageHash   string `json:"image_hash"`
 	Ports       []PortSpec
 	Mounts      []MountSpec
+	Volumes     []string
+	VolumesFrom []string `json:"volumes_from"`
 	Links       []Link
 	ExLinks     []Link
 	Env         Env
@@ -78,6 +80,17 @@ func (m *Manifest) Binds() []string {
 		s = append(s, v.String())
 	}
 	return s
+}
+
+func (m *Manifest) VolumeMap() map[string]struct{} {
+	if len(m.Volumes) == 0 {
+		return nil
+	}
+	v := make(map[string]struct{})
+	for _, volume := range m.Volumes {
+		v[volume] = struct{}{}
+	}
+	return v
 }
 
 func (m *Manifest) LinkList() []string {

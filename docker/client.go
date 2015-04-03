@@ -80,6 +80,7 @@ func (c *Client) Run(m *Manifest, w io.Writer) error {
 			Image:        m.Image,
 			Env:          m.Env.Pairs(),
 			Cmd:          m.Cmd,
+			Volumes:      m.VolumeMap(),
 			ExposedPorts: m.ExposedPorts(),
 		},
 	})
@@ -94,6 +95,7 @@ func (c *Client) Run(m *Manifest, w io.Writer) error {
 		PortBindings: m.PortBindings(),
 		Links:        m.LinkList(),
 		DNS:          m.DNS,
+		VolumesFrom:  m.VolumesFrom,
 		NetworkMode:  m.NetworkMode,
 	})
 	if err != nil || m.StartWait == 0 {
