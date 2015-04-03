@@ -137,20 +137,30 @@ func gatherCapabilities(agents []string) Capabilities {
 }
 
 func findBestAgent(m *docker.Manifest, caps Capabilities) string {
-	// Check existence of a container to be replaced
-	if m.Replace != "" {
+	if m.Replace == "" {
+		// Check availability of name
+		caps.Filter(func(cap *rpc.Capability) bool {
+			return !stringSlice(cap.AllNames).Contains(m.Name)
+		})
+	} else {
+		// Check existence of a container to be replaced
 		caps.Filter(func(cap *rpc.Capability) bool {
 			return stringSlice(cap.AllNames).Contains(m.Replace)
 		})
-	}
-
-	// Check availability of name
-	caps2 := caps.Copy()
-	caps.Filter(func(cap *rpc.Capability) bool {
-		return !stringSlice(cap.UsedNames).Contains(m.Name)
-	})
-	if len(caps) == 0 && m.Name == m.Replace {
-		caps = caps2
+		if m.Name == m.Replace {
+			// Already satisfied but prefer non-running container
+			caps2 := caps.Copy()
+			caps.Filter(func(cap *rpc.Capability) bool {
+				return !stringSlice(cap.UsedNames).Contains(m.Name)
+			})
+			if len(caps) == 0 {
+				caps = caps2
+			}
+		} else {
+			caps.Filter(func(cap *rpc.Capability) bool {
+				return !stringSlice(cap.AllNames).Contains(m.Name)
+			})
+		}
 	}
 
 	// Check availability of ports
