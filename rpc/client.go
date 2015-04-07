@@ -330,15 +330,17 @@ func Exec(addrs []string, container string, cmd []string, interactive, tty bool)
 }
 
 type logWriter struct {
-	c  chan string
-	wg sync.WaitGroup
-	rs []io.ReadCloser
-	m  sync.Mutex
+	c      chan string
+	wg     sync.WaitGroup
+	rs     []io.ReadCloser
+	m      sync.Mutex
+	closed chan struct{}
 }
 
 func newLogWriter(w io.Writer) *logWriter {
 	lw := &logWriter{
-		c: make(chan string),
+		c:      make(chan string),
+		closed: make(chan struct{}),
 	}
 	go lw.write(w)
 	return lw
@@ -348,6 +350,7 @@ func (l *logWriter) write(w io.Writer) {
 	for s := range l.c {
 		fmt.Fprintln(w, s)
 	}
+	close(l.closed)
 }
 
 func (l *logWriter) read(prefix string, r io.ReadCloser) {
@@ -369,6 +372,7 @@ func (l *logWriter) read(prefix string, r io.ReadCloser) {
 func (l *logWriter) wait() {
 	l.wg.Wait()
 	close(l.c)
+	<-l.closed
 }
 
 func (l *logWriter) close() {
