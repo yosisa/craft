@@ -15,9 +15,9 @@ type CmdImages struct{}
 func (opts *CmdImages) Execute(args []string) error {
 	images, err := rpc.ListImages(gopts.agents())
 	logRPCError(err)
-	for agent, resp := range images {
+	for _, agent := range sortedKeys(images) {
 		fmt.Printf("[%s]\n", agent)
-		imgs := resp.(*rpc.ListImagesResponse).Images
+		imgs := images[agent].(*rpc.ListImagesResponse).Images
 		if len(imgs) == 0 {
 			fmt.Println()
 			continue

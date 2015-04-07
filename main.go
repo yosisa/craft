@@ -326,3 +326,12 @@ func logRPCError(err error) {
 		log.WithField("error", err).Error("RPC error")
 	}
 }
+
+func sortedKeys(m map[string]interface{}) []string {
+	var out []string
+	for key := range m {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
+}

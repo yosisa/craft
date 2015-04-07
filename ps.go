@@ -18,9 +18,9 @@ type CmdPs struct {
 func (opts *CmdPs) Execute(args []string) error {
 	containers, err := rpc.ListContainers(gopts.agents(), opts.All)
 	logRPCError(err)
-	for agent, resp := range containers {
+	for _, agent := range sortedKeys(containers) {
 		fmt.Printf("[%s]\n", agent)
-		cons := resp.(*rpc.ListContainersResponse).Containers
+		cons := containers[agent].(*rpc.ListContainersResponse).Containers
 		if len(cons) == 0 {
 			fmt.Println()
 			continue
