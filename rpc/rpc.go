@@ -18,6 +18,7 @@ const dialTimeout = 5 * time.Second
 
 var (
 	agentName string
+	labels    map[string]string
 	ipAddrs   []string
 )
 
@@ -31,6 +32,7 @@ type Empty struct{}
 type Capability struct {
 	Available  bool
 	Agent      string
+	Labels     map[string]string
 	IPAddrs    []string
 	AllNames   []string
 	UsedNames  []string
@@ -87,6 +89,7 @@ func (c *Craft) Capability(req Empty, resp *Capability) error {
 	}
 	resp.Available = true
 	resp.Agent = agentName
+	resp.Labels = labels
 	resp.IPAddrs = ipAddrs
 	resp.AllNames = ui.AllNames
 	resp.UsedNames = ui.UsedNames
@@ -133,6 +136,7 @@ func (c *Craft) unlock() {
 
 func ListenAndServe(c *config.Config) error {
 	agentName = c.AgentName
+	labels = c.Labels
 	ips, err := ListIPAddrs()
 	if err != nil {
 		return err

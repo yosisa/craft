@@ -10,6 +10,7 @@ type Config struct {
 	Listen    string
 	Docker    string
 	AgentName string `json:"agent_name"`
+	Labels    map[string]string
 	Agents    []string
 }
 

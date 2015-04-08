@@ -212,6 +212,15 @@ func findBestAgent(m *docker.Manifest, caps Capabilities) string {
 		})
 	}
 
+	// Label restriction
+	if len(m.Restrict.Labels) > 0 {
+		for key, value := range m.Restrict.Labels {
+			caps.Filter(func(cap *rpc.Capability) bool {
+				return cap.Labels[key] == value
+			})
+		}
+	}
+
 	// Conflicts restriction
 	for _, conflict := range m.Restrict.Conflicts {
 		re := regexp.MustCompile(conflict)

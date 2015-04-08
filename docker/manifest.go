@@ -188,6 +188,7 @@ func (e Env) Pairs() []string {
 
 type Restrict struct {
 	Agent     string
+	Labels    map[string]string
 	Conflicts []string
 }
 
