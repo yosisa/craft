@@ -13,6 +13,9 @@ import (
 type CmdPs struct {
 	All  bool `short:"a" long:"all" description:"Show all containers"`
 	Full bool `long:"full" description:"Show full command"`
+	Args struct {
+		Containers []string `positional-arg-name:"CONTAINER"`
+	} `positional-args:"yes"`
 }
 
 func (opts *CmdPs) Execute(args []string) error {
@@ -20,7 +23,7 @@ func (opts *CmdPs) Execute(args []string) error {
 	logRPCError(err)
 	for _, agent := range sortedKeys(containers) {
 		fmt.Printf("[%s]\n", agent)
-		cons := containers[agent].(*rpc.ListContainersResponse).Containers
+		cons := containers[agent].(*rpc.ListContainersResponse).FilterByNames(opts.Args.Containers)
 		if len(cons) == 0 {
 			fmt.Println()
 			continue

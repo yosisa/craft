@@ -30,6 +30,24 @@ type ListContainersResponse struct {
 	Containers []docker.APIContainers
 }
 
+func (r *ListContainersResponse) FilterByNames(names []string) []docker.APIContainers {
+	if len(names) == 0 {
+		return r.Containers
+	}
+
+	m := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		m[name] = struct{}{}
+	}
+	var out []docker.APIContainers
+	for _, con := range r.Containers {
+		if _, ok := m[cdocker.CanonicalName(con.Names)]; ok {
+			out = append(out, con)
+		}
+	}
+	return out
+}
+
 func (d *Docker) ListContainers(req ListContainersRequest, resp *ListContainersResponse) error {
 	cons, err := d.c.ListContainers(docker.ListContainersOptions{All: req.All})
 	if err != nil {
