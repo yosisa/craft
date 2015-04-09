@@ -13,11 +13,14 @@ andExpr <- wsp "and" wsp primary { p.And() }
 primary <- '(' ws Expr ws ')'
          / "not" wsp primary { p.Not() }
          / agent
+         / label
 
 agent   <- "A@" <regexp> { p.Agent(buffer[begin:end]) }
+label   <- "L@" <char+ ':' char+> { p.Label(buffer[begin:end]) }
+
 regexp  <- char* '(' regexp ')' char*
          / char* '|' regexp*
          / char+
-char    <- ![ ()] .
+char    <- ![ ():] .
 ws      <- ' '*
 wsp     <- ' '+

@@ -3,6 +3,7 @@ package filter
 import (
 	"errors"
 	"regexp"
+	"strings"
 
 	"github.com/yosisa/craft/rpc"
 )
@@ -50,6 +51,16 @@ func (e *agent) Eval(cap *rpc.Capability) bool {
 	return e.re.MatchString(cap.Agent)
 }
 
+type label struct {
+	name  string
+	value string
+}
+
+func (e *label) Eval(cap *rpc.Capability) bool {
+	v, ok := cap.Labels[e.name]
+	return ok && v == e.value
+}
+
 func (p *parser) pushStack(e Evaluator) {
 	p.stack = append(p.stack, e)
 }
@@ -66,6 +77,11 @@ func (p *parser) Agent(s string) {
 		p.err = err
 	}
 	p.pushStack(&agent{re})
+}
+
+func (p *parser) Label(s string) {
+	parts := strings.SplitN(s, ":", 2)
+	p.pushStack(&label{name: parts[0], value: parts[1]})
 }
 
 func (p *parser) Not() {
