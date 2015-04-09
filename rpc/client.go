@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 
@@ -121,8 +119,8 @@ func PullImage(addrs []string, image string) error {
 }
 
 func Logs(addrs []string, container string, follow bool, tail string) error {
-	dstout := newLogWriter(os.Stdout)
-	dsterr := newLogWriter(os.Stderr)
+	dstout := newAtomicWriter(os.Stdout)
+	dsterr := newAtomicWriter(os.Stderr)
 	closed := make(chan struct{})
 	if follow {
 		go func() {
@@ -146,8 +144,8 @@ func Logs(addrs []string, container string, follow bool, tail string) error {
 		if err != nil {
 			return nil, err
 		}
-		go dstout.read(fmt.Sprintf("[%s] ", addr), osc)
-		go dsterr.read(fmt.Sprintf("[%s] ", addr), esc)
+		go dstout.read(fmt.Sprintf("[%s] ", ShortHostname(addr, true)), osc)
+		go dsterr.read(fmt.Sprintf("[%s] ", ShortHostname(addr, true)), esc)
 
 		req := LogsRequest{
 			Container:   container,
@@ -327,60 +325,6 @@ func Exec(addrs []string, container string, cmd []string, interactive, tty bool)
 		return nil, safeError(err)
 	})
 	return err
-}
-
-type logWriter struct {
-	c      chan string
-	wg     sync.WaitGroup
-	rs     []io.ReadCloser
-	m      sync.Mutex
-	closed chan struct{}
-}
-
-func newLogWriter(w io.Writer) *logWriter {
-	lw := &logWriter{
-		c:      make(chan string),
-		closed: make(chan struct{}),
-	}
-	go lw.write(w)
-	return lw
-}
-
-func (l *logWriter) write(w io.Writer) {
-	for s := range l.c {
-		fmt.Fprintln(w, s)
-	}
-	close(l.closed)
-}
-
-func (l *logWriter) read(prefix string, r io.ReadCloser) {
-	l.m.Lock()
-	l.rs = append(l.rs, r)
-	l.m.Unlock()
-
-	l.wg.Add(1)
-	defer l.wg.Done()
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		l.c <- prefix + s.Text()
-	}
-	if err := s.Err(); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-		log.WithField("error", err).Error("Failed to read log stream")
-	}
-}
-
-func (l *logWriter) wait() {
-	l.wg.Wait()
-	close(l.c)
-	<-l.closed
-}
-
-func (l *logWriter) close() {
-	l.m.Lock()
-	defer l.m.Unlock()
-	for _, r := range l.rs {
-		r.Close()
-	}
 }
 
 func safeError(err error) error {
