@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"time"
 
@@ -28,41 +30,53 @@ func (opts *CmdPs) Execute(args []string) error {
 			fmt.Println()
 			continue
 		}
-		var nn, ni, nc, nt, ns int
-		for _, c := range cons {
-			if n := len(docker.CanonicalName(c.Names)); n > nn {
-				nn = n
-			}
-			if n := len(c.Image); n > ni {
-				ni = n
-			}
-			if n := len(c.Command); n > nc {
-				nc = n
-			}
-			if n := len(humanize.Time(time.Unix(c.Created, 0))); n > nt {
-				nt = n
-			}
-			if n := len(c.Status); n > ns {
-				ns = n
-			}
-		}
-		if nc > 20 && !opts.Full {
-			nc = 20
-		}
-		s := "  %-15s%-" + strconv.Itoa(nn+3) + "s%-" + strconv.Itoa(ni+3) + "s%-" +
-			strconv.Itoa(nc+3) + "s%-" + strconv.Itoa(nt+3) + "s%-" + strconv.Itoa(ns+3) + "s%s\n"
-		fmt.Printf(s, "CONTAINER ID", "NAME", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS")
+		var tw tableWriter
+		tw.Append("CONTAINER ID", "NAME", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS")
 		for _, c := range cons {
 			cmd := c.Command
 			if len(cmd) > 20 && !opts.Full {
 				cmd = cmd[:20]
 			}
-			fmt.Printf(s, c.ID[:12], docker.CanonicalName(c.Names), c.Image, cmd,
+			tw.Append(c.ID[:12], docker.CanonicalName(c.Names), c.Image, cmd,
 				humanize.Time(time.Unix(c.Created, 0)), c.Status, docker.FormatPorts(c.Ports))
 		}
+		tw.Write(os.Stdout, "  ")
 		fmt.Println()
 	}
 	return nil
+}
+
+type tableWriter struct {
+	rows  [][]interface{}
+	width []int
+}
+
+func (t *tableWriter) Append(cols ...string) {
+	if t.width == nil {
+		t.width = make([]int, len(cols))
+	}
+	if len(cols) != len(t.width) {
+		panic("tableWriter: length mismatch")
+	}
+	var row []interface{}
+	for i, col := range cols {
+		row = append(row, col)
+		if n := len(col); n > t.width[i] {
+			t.width[i] = n
+		}
+	}
+	t.rows = append(t.rows, row)
+}
+
+func (t *tableWriter) Write(w io.Writer, prefix string) {
+	s := prefix
+	for _, n := range t.width {
+		s += "%-" + strconv.Itoa(n+3) + "s"
+	}
+	s += "\n"
+	for _, row := range t.rows {
+		fmt.Fprintf(w, s, row...)
+	}
 }
 
 func init() {
