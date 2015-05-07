@@ -7,7 +7,9 @@ import (
 )
 
 type CmdSubmit struct {
-	Args struct {
+	NameSuffix    string `long:"name-suffix" description:"Append to name value"`
+	ReplaceSuffix string `long:"replace-suffix" description:"Append to replace value"`
+	Args          struct {
 		Manifest string `positional-arg-name:"MANIFEST"`
 	} `positional-args:"yes" required:"yes"`
 }
@@ -17,6 +19,8 @@ func (opts *CmdSubmit) Execute(args []string) error {
 	if err != nil {
 		log.WithField("error", err).Fatal("Could not parse manifest")
 	}
+	m.Name += opts.NameSuffix
+	m.Replace += opts.ReplaceSuffix
 
 	caps := gatherCapabilities(gopts.agents())
 	agent := findBestAgent(m, caps.Copy())
